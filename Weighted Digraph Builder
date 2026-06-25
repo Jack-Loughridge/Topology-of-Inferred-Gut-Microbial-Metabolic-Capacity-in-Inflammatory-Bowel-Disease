@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from __future__ import annotations
+import os, math, random, itertools
+from dataclasses import dataclass
+from typing import Dict, List, Tuple, Iterable
+from collections import defaultdict
+
+import numpy as np
+import pandas as pd
+import networkx as nx
+
+# ======================
+# Configuration
+# ======================
+
+class CONFIG:
+    # All paths are interpreted relative to the directory
+    # from which you run:  python3 Real_Data/build_microbiome_graphs.py
+    DATA_DIR = "."
+    OUT_DIR  = "./out_graphs"
+
+    # Our aligned species abundances (samples x taxa)
+    FILE_SPECIES_ABUND = "Real_Species_Abundances_canon.xlsx"
+
+    # Reactions extracted from AGORA SBML, now stored as Parquet
+    FILE_REACTIONS     = "AGORA_reactions_canon.parquet"
+
+    # (Unused in the current script, but kept for future phenotype work)
+    FILE_METADATA      = "Real_Metadata_and_Phenotypes.xlsx"
+
+    # ---- Column mapping for the reactions table ----
+    REACTIONS_SHEET = 0                 # only used if FILE_REACTIONS is Excel
+    COL_REACTION_ID = "reaction_id"
+    COL_INPUTS      = "inputs"          # "A;B;C" or "A,B,C" etc
+    COL_OUTPUTS     = "outputs"
+    COL_CATALYSTS   = "catalysts"       # species names/IDs matching abundance columns
+
+    # ---- Species abundance table mapping ----
+    SPECIES_SHEET   = 0
+    COL_SAMPLE_ID   = "sample_id"       # used only if samples are not the index
+    SAMPLES_IN_INDEX = True             # True if first column is sample_id and species are columns
+
+    # ---- Gating / graph params ----
+    RANDOM_SEED      = 13
+    TAU_THRESHOLD    = 0.0001               # permissive τ for multi-input gate
+    ROOTS_PER_INPUT  = 50              # number of random roots drawn per input substrate
+    MAX_BETA_POOL    = 2500            # safety cap for β candidates
+
+    # ---- Edge filtering / weighting ----
+    EPSILON          = 1e-8
+    THETA_MIN        = 0            # min aggregate support to keep edge in a sample
+
+    # ---- Currency metabolites to exclude entirely (case-insensitive → uppercased) ----
+    CURRENCY = {
+        "H2O","WATER","PROTON","H+","ATP","ADP","PI","PPI","CO2","CO(2)","NAD","NADH",
+        "NADP","NADPH","FAD","FADH2","NAD(P)H","OXYGEN","O2","NH3","AMMONIA","HCO3-",
+        "BICARBONATE","CO-A","COENZYME_A","COENZYME A","S-ADENOSYLMETHIONINE","SAM",
+        "S-ADENOSYLHOMOCYSTEINE","SAH","UMP","UDP","UTP","AMP","CMP","CDP","CTP",
+        "GMP","GDP","GTP"
+    }
+
+# ======================
+# Helpers
+# ======================
+
+def _canon(x: str) -> str:
+    """Canonical metabolite name: uppercase + spaces→underscores."""
+    return str(x).strip().upper().replace(" ", "_")
+
+def _is_currency(x: str) -> bool:
+    return _canon(x) in CONFIG.CURRENCY
+
+def parse_listish(cell) -> List[str]:
+    """Parse 'A;B;C' / 'A,B,C' / 'A|B|C' into a list of strings."""
+    if pd.isna(cell):
+        return []
+    s = str(cell)
+    for sep in [";", "|"]:
+        s = s.replace(sep, ",")
+    return [t.strip() for t in s.split(",") if t.strip()]
+
+def geometric_mean(vals: Iterable[float]) -> float:
+    arr = [float(v) for v in vals if v > 0]
+    if not arr:
+        return 0.0
+    return float(np.exp(np.mean(np.log(arr))))
+
+# ======================
+# Data structures
+# ======================
+
+@dataclass(frozen=True)
+class Reaction:
+    rid: str
+    inputs: Tuple[str, ...]     # canonical substrate names
+    outputs: Tuple[str, ...]
+    catalysts: Tuple[str, ...]  # species as appear in abundance table
+
+# ======================
+# Load data
+# ======================
+
+def load_reactions(path: str) -> List[Reaction]:
+    """
+    Load reactions from either a Parquet file (preferred: AGORA_reactions.parquet)
+    or from an Excel file with the same column schema.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".parquet", ".pq"):
+        df = pd.read_parquet(path)
+    else:
+        df = pd.read_excel(path, sheet_name=CONFIG.REACTIONS_SHEET)
+
+    need = [CONFIG.COL_REACTION_ID, CONFIG.COL_INPUTS,
+            CONFIG.COL_OUTPUTS, CONFIG.COL_CATALYSTS]
+    missing = [c for c in need if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing columns in {path}: {missing}")
+
+    recs: List[Reaction] = []
+    for _, row in df.iterrows():
+        rid = str(row[CONFIG.COL_REACTION_ID]).strip()
+
+        ins  = tuple(_canon(x) for x in parse_listish(row[CONFIG.COL_INPUTS])
+                    if not _is_currency(x))
+        outs = tuple(_canon(x) for x in parse_listish(row[CONFIG.COL_OUTPUTS])
+                    if not _is_currency(x))
+        cats = tuple(str(x).strip() for x in parse_listish(row[CONFIG.COL_CATALYSTS]))
+
+        # discard reactions with nothing usable
+        if not ins or not outs or not cats:
+            continue
+        recs.append(Reaction(rid=rid, inputs=ins, outputs=outs, catalysts=cats))
+    return recs
+
+def load_species_abund(path: str) -> pd.DataFrame:
+    """
+    Load aligned species abundances saved as Real_Species_Abundances.xlsx.
+    This is samples x taxa, with the index = sample IDs (External IDs).
+    """
+    df = pd.read_excel(path, sheet_name=CONFIG.SPECIES_SHEET)
+    if CONFIG.SAMPLES_IN_INDEX:
+        # pandas.to_excel wrote the index as the first column; restore it.
+        df = df.set_index(df.columns[0])
+        df.index.name = CONFIG.COL_SAMPLE_ID
+    elif CONFIG.COL_SAMPLE_ID in df.columns:
+        df = df.set_index(CONFIG.COL_SAMPLE_ID)
+
+    df = df.fillna(0.0)
+    return df  # rows = samples, cols = species/taxa
+
+# ======================
+# Build substrate scaffold (undirected) for the gate distances
+# ======================
+
+def build_global_substrate_graph(reactions: List[Reaction]) -> nx.Graph:
+    G = nx.Graph()
+    for r in reactions:
+        for x in r.inputs + r.outputs:
+            if not _is_currency(x):
+                G.add_node(_canon(x))
+
+        # connect inputs together (co-input clique)
+        for a, b in itertools.combinations(r.inputs, 2):
+            G.add_edge(_canon(a), _canon(b))
+
+        # connect input→output (undirected for distance scaffold)
+        for a in r.inputs:
+            for b in r.outputs:
+                if not _is_currency(a) and not _is_currency(b):
+                    G.add_edge(_canon(a), _canon(b))
+    return G
+
+# ======================
+# Multi-input gate (τ rule)
+# ======================
+
+def multi_input_gate(inputs: Tuple[str, ...], G0: nx.Graph, tau: float,
+                     roots_per_input: int, rng: random.Random) -> bool:
+    """
+    τ-gate for multi-input reactions: keeps reactions whose inputs
+    are "not too far apart" in the global substrate graph G0.
+    """
+    if len(inputs) <= 1:
+        return True
+
+    nodes = list(G0.nodes)
+    if not nodes:
+        return False
+
+    # sample distances D_i for each input
+    D: Dict[str, List[int]] = {a: [] for a in inputs}
+
+    for Ai in inputs:
+        trials = 0
+        while len(D[Ai]) < roots_per_input and trials < roots_per_input * 4:
+            trials += 1
+            root = rng.choice(nodes)
+            if not nx.has_path(G0, root, Ai):
+                continue
+            d = nx.shortest_path_length(G0, root, Ai)
+            D[Ai].append(int(d))
+
+    if any(len(v) == 0 for v in D.values()):
+        return False
+
+    beta_pool = sorted(set(itertools.chain.from_iterable(D.values())))
+    if not beta_pool:
+        return False
+    if len(beta_pool) > CONFIG.MAX_BETA_POOL:
+        beta_pool = beta_pool[:CONFIG.MAX_BETA_POOL]
+
+    def s_of_beta(beta: int) -> float:
+        # s(β) = max_i min_{d in D_i} |β - d|
+        return max(min(abs(beta - d) for d in D[Ai]) for Ai in inputs)
+
+    scores = [(beta, s_of_beta(beta)) for beta in beta_pool]
+    scores.sort(key=lambda x: x[1])
+    top3 = scores[:3] if len(scores) >= 3 else scores
+    if not top3:
+        return False
+    avg_s = float(sum(s for _, s in top3)) / len(top3)
+    return (avg_s < tau)
+
+# ======================
+# Map accepted reactions to edges; compute supports and weights
+# ======================
+
+def accepted_edges_map(reactions: List[Reaction], G0: nx.Graph,
+                       rng: random.Random
+                      ) -> Dict[Tuple[str,str], List[Reaction]]:
+    edge2rxns: Dict[Tuple[str,str], List[Reaction]] = defaultdict(list)
+    for r in reactions:
+        if not multi_input_gate(r.inputs, G0, CONFIG.TAU_THRESHOLD,
+                                CONFIG.ROOTS_PER_INPUT, rng):
+            continue
+        for a in r.inputs:
+            for b in r.outputs:
+                A, B = _canon(a), _canon(b)
+                if A == B or _is_currency(A) or _is_currency(B):
+                    continue
+                edge2rxns[(A,B)].append(r)
+    return edge2rxns
+
+def compute_supports(edge2rxns: Dict[Tuple[str,str], List[Reaction]],
+                     species_abund: pd.DataFrame
+                    ) -> Tuple[List[str], Dict[Tuple[str,str], Dict[str,float]]]:
+    """
+    For each edge (A,B) and sample s, compute support E[(A,B)][s] =
+    sum of abundances of all catalysts that can realise this edge.
+    """
+    sample_ids = [str(s) for s in species_abund.index]
+    E: Dict[Tuple[str,str], Dict[str,float]] = defaultdict(dict)
+
+    for edge, rxns in edge2rxns.items():
+        # all distinct catalysts implicated in ANY reaction realising this edge
+        species = sorted(set(itertools.chain.from_iterable(r.catalysts for r in rxns)))
+        species = [sp for sp in species if sp in species_abund.columns]
+        if not species:
+            for sid in sample_ids:
+                E[edge][sid] = 0.0
+            continue
+
+        sums = species_abund.loc[:, species].sum(axis=1)  # sum over catalysts
+        for sid, val in sums.items():
+            E[edge][str(sid)] = float(val)
+
+    # fill zeros for any missing (shouldn’t really happen, but keep it robust)
+    for edge in edge2rxns.keys():
+        for sid in sample_ids:
+            E[edge].setdefault(sid, 0.0)
+
+    return sample_ids, E
+
+def compute_baselines(E: Dict[Tuple[str,str], Dict[str,float]]
+                     ) -> Dict[Tuple[str,str], float]:
+    baselines: Dict[Tuple[str,str], float] = {}
+    for edge, sample_map in E.items():
+        baselines[edge] = geometric_mean(sample_map.values())
+    return baselines
+
+# ======================
+# Build and write graphs
+# ======================
+
+def build_and_save_graphs(species_abund: pd.DataFrame,
+                          reactions: List[Reaction]) -> None:
+    os.makedirs(CONFIG.OUT_DIR, exist_ok=True)
+    rng = random.Random(CONFIG.RANDOM_SEED)
+
+    # global scaffold for distances
+    G0 = build_global_substrate_graph(reactions)
+
+    # accepted reactions → directed edges
+    edge2rxns = accepted_edges_map(reactions, G0, rng)
+
+    # per-sample supports
+    sample_ids, E = compute_supports(edge2rxns, species_abund)
+
+    # cohort baselines for weights
+    Ehat = compute_baselines(E)
+
+    # save baselines table for transparency
+    rows = []
+    for (A,B), base in Ehat.items():
+        rows.append({"A": A, "B": B, "E_hat_geom": base})
+    pd.DataFrame(rows).to_csv(
+        os.path.join(CONFIG.OUT_DIR, "global_baselines.csv"), index=False
+    )
+
+    # build each sample’s directed graph
+    for sid in sample_ids:
+        Gs = nx.DiGraph(sample_id=sid)
+        edge_rows = []
+
+        for (A,B), rxns in edge2rxns.items():
+            Es = E[(A,B)][sid]
+            if Es < CONFIG.THETA_MIN:
+                continue
+
+            w = math.exp(- Es / (Ehat[(A,B)] + CONFIG.EPSILON))
+
+            # attach edge with attributes
+            Gs.add_edge(
+                A, B,
+                weight   = w,
+                support  = Es,
+                baseline = Ehat[(A,B)],
+                n_reactions = len(rxns)
+            )
+
+            edge_rows.append({
+                "A": A,
+                "B": B,
+                "support_E": Es,
+                "baseline_Ehat": Ehat[(A,B)],
+                "weight": w,
+                "n_reactions": len(rxns)
+            })
+
+        # write if non-empty
+        if Gs.number_of_edges() > 0:
+            base = os.path.join(CONFIG.OUT_DIR, f"{sid}")
+
+            # GraphML (rich attributes)
+            nx.write_graphml(Gs, base + ".graphml")
+
+            # Lightweight edgelist (A B weight)
+            with open(base + ".edgelist", "w", encoding="utf-8") as f:
+                for u, v, d in Gs.edges(data=True):
+                    f.write(f"{u}\t{v}\t{d.get('weight',1.0):.10f}\n")
+
+            # CSV of edges for the sample
+            pd.DataFrame(edge_rows).sort_values(
+                ["A", "B"]
+            ).to_csv(base + "_edges.csv", index=False)
+        else:
+            # still drop a tiny sentinel file so we remember it ran
+            with open(os.path.join(CONFIG.OUT_DIR, f"{sid}_EMPTY.txt"), "w") as f:
+                f.write("No edges passed thresholds for this sample.\n")
+
+# ======================
+# Main
+# ======================
+
+def main():
+    data_dir = CONFIG.DATA_DIR
+    species_path   = os.path.join(data_dir, CONFIG.FILE_SPECIES_ABUND)
+    reactions_path = os.path.join(data_dir, CONFIG.FILE_REACTIONS)
+
+    print("[*] Loading species abundances…")
+    abund = load_species_abund(species_path)
+    print("    Abundance table shape (samples x taxa):", abund.shape)
+
+    print("[*] Loading reactions…")
+    reactions = load_reactions(reactions_path)
+    print(f"    Loaded {len(reactions)} usable reactions after currency filtering.")
+
+    print("[*] Building graphs per sample (no out-degree cap)…")
+    build_and_save_graphs(abund, reactions)
+
+    print(f"[*] Done. Check: {CONFIG.OUT_DIR}")
+
+if __name__ == "__main__":
+    main()
