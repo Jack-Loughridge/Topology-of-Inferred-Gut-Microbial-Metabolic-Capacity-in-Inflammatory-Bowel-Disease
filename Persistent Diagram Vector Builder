@@ -1,0 +1,390 @@
+cd ~/Real_Data
+
+cat > build_h0_diagrams.py <<'PY'
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+build_h0_diagrams.py
+
+Build H0 persistence diagrams from directed weighted microbiome substrate graphs.
+
+Primary manuscript convention
+-----------------------------
+Input graphs are directed weighted substrate graphs. For H0 only, direction is
+ignored because H0 measures connected components.
+
+For each sample graph:
+    - Treat directed edges as undirected for connectivity.
+    - Use edge attribute `weight` directly as the filtration value / distance.
+    - Lower weight means stronger / earlier connection.
+    - Sort edges by increasing weight.
+    - Run Kruskal-style union-find.
+    - Each successful component merge gives one finite H0 interval:
+          birth = 0
+          death = edge weight at merge
+
+Outputs
+-------
+For each sample:
+    <sample_id>_H0.npy
+        NumPy array of shape [n_merges, 2], columns [birth, death].
+
+Summary:
+    h0_summary.csv
+        sample_id, label, n_nodes, n_directed_edges, n_undirected_edges,
+        n_H0_points, n_components_final, h0_file.
+
+Notes
+-----
+This script intentionally computes only H0. The earlier H1-like directed cycle
+cloud code is not included because those features were discarded from the
+reported manuscript analyses.
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import logging
+import os
+from pathlib import Path
+from typing import Dict, Iterable, List, Tuple
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+
+
+# ---------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------
+
+DEFAULT_GRAPH_DIR = "/home/Jack/Real_Data/out_graphs"
+DEFAULT_OUTPUT_DIR = "/home/Jack/Real_Data/out_pds"
+DEFAULT_LABEL_CSV = "/home/Jack/Real_Data/sample_labels.csv"
+
+MIN_EDGE_WEIGHT = 1e-9
+
+
+# ---------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------
+
+def setup_logging(verbose: bool = False):
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="[%(asctime)s] %(levelname)s - %(message)s",
+    )
+
+
+# ---------------------------------------------------------------------
+# Union-find
+# ---------------------------------------------------------------------
+
+class UnionFind:
+    def __init__(self, elements: Iterable[object]):
+        self.parent = {e: e for e in elements}
+        self.rank = {e: 0 for e in elements}
+
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+
+    def union(self, x, y) -> bool:
+        """
+        Merge components containing x and y.
+
+        Returns True if a merge occurred and False if x and y were already
+        in the same component.
+        """
+        rx = self.find(x)
+        ry = self.find(y)
+
+        if rx == ry:
+            return False
+
+        if self.rank[rx] < self.rank[ry]:
+            rx, ry = ry, rx
+
+        self.parent[ry] = rx
+
+        if self.rank[rx] == self.rank[ry]:
+            self.rank[rx] += 1
+
+        return True
+
+    def n_components(self) -> int:
+        return len({self.find(x) for x in self.parent})
+
+
+# ---------------------------------------------------------------------
+# Labels
+# ---------------------------------------------------------------------
+
+def load_labels(label_csv_path: str) -> Dict[str, str]:
+    """
+    Load sample_id -> label from a CSV if available.
+
+    Expected columns:
+        sample_id, label
+
+    If the file is missing or columns are absent, labels are set to unknown.
+    """
+    if not os.path.exists(label_csv_path):
+        logging.warning("Label CSV not found at %s; using unknown labels.", label_csv_path)
+        return {}
+
+    try:
+        df = pd.read_csv(label_csv_path)
+    except Exception as e:
+        logging.warning("Could not read label CSV %s: %s", label_csv_path, e)
+        return {}
+
+    if "sample_id" not in df.columns or "label" not in df.columns:
+        logging.warning(
+            "Label CSV %s does not contain sample_id and label columns; ignoring.",
+            label_csv_path,
+        )
+        return {}
+
+    mapping = dict(zip(df["sample_id"].astype(str), df["label"].astype(str)))
+    logging.info("Loaded %d labels from %s", len(mapping), label_csv_path)
+
+    return mapping
+
+
+# ---------------------------------------------------------------------
+# H0 computation
+# ---------------------------------------------------------------------
+
+def directed_edges_to_undirected_min_weight(
+    G: nx.DiGraph,
+    min_edge_weight: float = MIN_EDGE_WEIGHT,
+) -> List[Tuple[object, object, float]]:
+    """
+    Convert directed weighted edges to an undirected edge list for H0.
+
+    If both u->v and v->u are present, retain the smaller weight because lower
+    weight means earlier connection in the filtration.
+
+    Returns:
+        list of (u, v, weight), with u/v ordered deterministically by string.
+    """
+    best = {}
+
+    for u, v, data in G.edges(data=True):
+        w = float(data.get("weight", 1.0))
+
+        if not np.isfinite(w):
+            continue
+
+        if w <= 0:
+            w = min_edge_weight
+
+        # Deterministic undirected key.
+        su, sv = str(u), str(v)
+        key = (u, v) if su <= sv else (v, u)
+
+        if key not in best or w < best[key]:
+            best[key] = w
+
+    edges = [(u, v, w) for (u, v), w in best.items()]
+    edges.sort(key=lambda e: (e[2], str(e[0]), str(e[1])))
+
+    return edges
+
+
+def compute_h0_persistence(G: nx.DiGraph) -> Tuple[np.ndarray, int, int]:
+    """
+    Compute finite H0 persistence intervals from a directed weighted graph.
+
+    Direction is ignored for H0. Edge weights are used directly as filtration
+    values.
+
+    Returns:
+        pd_H0:
+            array of shape [n_merges, 2], columns [birth, death].
+        n_undirected_edges:
+            number of undirected edges after collapsing reciprocal edges.
+        n_components_final:
+            number of connected components after processing all edges.
+    """
+    if G.number_of_nodes() == 0:
+        return np.zeros((0, 2), dtype=float), 0, 0
+
+    uf = UnionFind(G.nodes())
+    edges = directed_edges_to_undirected_min_weight(G)
+
+    intervals = []
+
+    for u, v, w in edges:
+        if uf.union(u, v):
+            intervals.append((0.0, float(w)))
+
+    if intervals:
+        pd_H0 = np.asarray(intervals, dtype=float)
+    else:
+        pd_H0 = np.zeros((0, 2), dtype=float)
+
+    return pd_H0, len(edges), uf.n_components()
+
+
+# ---------------------------------------------------------------------
+# Per-file processing
+# ---------------------------------------------------------------------
+
+def sample_id_from_graph_path(path: str) -> str:
+    p = Path(path)
+    if p.name.endswith(".graphml"):
+        return p.name[:-len(".graphml")]
+    return p.stem
+
+
+def process_graph_file(
+    graph_path: str,
+    label_map: Dict[str, str],
+    output_dir: str,
+    overwrite: bool = False,
+) -> Dict[str, object]:
+    sample_id = sample_id_from_graph_path(graph_path)
+    out_path = Path(output_dir) / f"{sample_id}_H0.npy"
+
+    if out_path.exists() and not overwrite:
+        logging.info("Skipping %s because output exists. Use --overwrite to recompute.", sample_id)
+        pd_H0 = np.load(out_path)
+        G_raw = nx.read_graphml(graph_path)
+        G = nx.DiGraph(G_raw)
+        undirected_edges = directed_edges_to_undirected_min_weight(G)
+
+        return {
+            "sample_id": sample_id,
+            "label": label_map.get(sample_id, "unknown"),
+            "n_nodes": G.number_of_nodes(),
+            "n_directed_edges": G.number_of_edges(),
+            "n_undirected_edges": len(undirected_edges),
+            "n_H0_points": int(pd_H0.shape[0]),
+            "n_components_final": np.nan,
+            "h0_file": str(out_path),
+        }
+
+    logging.info("Processing %s", sample_id)
+
+    G_raw = nx.read_graphml(graph_path)
+    G = nx.DiGraph(G_raw)
+
+    pd_H0, n_undirected_edges, n_components_final = compute_h0_persistence(G)
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    np.save(out_path, pd_H0)
+
+    row = {
+        "sample_id": sample_id,
+        "label": label_map.get(sample_id, "unknown"),
+        "n_nodes": G.number_of_nodes(),
+        "n_directed_edges": G.number_of_edges(),
+        "n_undirected_edges": n_undirected_edges,
+        "n_H0_points": int(pd_H0.shape[0]),
+        "n_components_final": int(n_components_final),
+        "h0_file": str(out_path),
+    }
+
+    logging.info(
+        "%s: nodes=%d directed_edges=%d undirected_edges=%d H0_points=%d final_components=%d",
+        sample_id,
+        row["n_nodes"],
+        row["n_directed_edges"],
+        row["n_undirected_edges"],
+        row["n_H0_points"],
+        row["n_components_final"],
+    )
+
+    return row
+
+
+# ---------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------
+
+def main():
+    ap = argparse.ArgumentParser()
+
+    ap.add_argument(
+        "--graph-dir",
+        default=DEFAULT_GRAPH_DIR,
+        help="Directory containing sample .graphml files.",
+    )
+    ap.add_argument(
+        "--output-dir",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Directory where H0 arrays and summary CSV will be written.",
+    )
+    ap.add_argument(
+        "--label-csv",
+        default=DEFAULT_LABEL_CSV,
+        help="Optional CSV with sample_id,label columns.",
+    )
+    ap.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Recompute outputs even if .npy files already exist.",
+    )
+    ap.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Optional cap for smoke tests.",
+    )
+    ap.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable debug logging.",
+    )
+
+    args = ap.parse_args()
+
+    setup_logging(args.verbose)
+
+    graph_dir = Path(args.graph_dir)
+
+    if not graph_dir.is_dir():
+        raise RuntimeError(f"Graph directory not found: {graph_dir}")
+
+    graph_files = sorted(glob.glob(str(graph_dir / "*.graphml")))
+
+    if args.max_samples is not None:
+        graph_files = graph_files[:args.max_samples]
+
+    if not graph_files:
+        raise RuntimeError(f"No .graphml files found in {graph_dir}")
+
+    logging.info("Found %d graph files in %s", len(graph_files), graph_dir)
+
+    label_map = load_labels(args.label_csv)
+
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
+    rows = []
+
+    for i, gp in enumerate(graph_files, 1):
+        logging.info("Graph %d/%d", i, len(graph_files))
+
+        row = process_graph_file(
+            graph_path=gp,
+            label_map=label_map,
+            output_dir=args.output_dir,
+            overwrite=args.overwrite,
+        )
+        rows.append(row)
+
+    summary = pd.DataFrame(rows)
+    summary_path = Path(args.output_dir) / "h0_summary.csv"
+    summary.to_csv(summary_path, index=False)
+
+    logging.info("Wrote H0 summary to %s", summary_path)
+
+
+if __name__ == "__main__":
+    main()
+PY
