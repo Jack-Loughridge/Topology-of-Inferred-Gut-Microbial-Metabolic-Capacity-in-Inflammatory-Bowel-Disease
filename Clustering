@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""
+Directed clustering diagnostics for active metabolic digraphs.
+
+This script computes:
+
+1. Sample-level directed clustering
+   - Uses each sample graph separately.
+   - Removes inactive / unsupported edges, defined as edges with w == 1.
+   - Computes:
+       a) unweighted directed clustering
+       b) weighted directed clustering using strength s = 1 - w
+   - NetworkX's directed clustering for DiGraph follows the Fagiolo-style
+     directed triangle coefficient.
+
+2. Participant-level union directed clustering
+   - For each participant, builds the union of active edges across all samples.
+   - An edge is present in the participant graph if it appears as active in at
+     least one sample.
+   - The participant-level edge weight is the mean observed weight conditional
+     on the edge being active/present.
+   - The participant-level edge strength is s = 1 - mean_weight_when_present.
+   - This avoids the incorrect behaviour where rare active edges become
+     artificially strong by dividing their weight sum by total participant
+     sample count.
+
+Outputs:
+  ~/Real_Data/Ricci_Summary/directed_clustering_active_sample_level.csv
+  ~/Real_Data/Ricci_Summary/directed_clustering_participant_union_level.csv
+  ~/Real_Data/Ricci_Summary/directed_clustering_active_union_summary.csv
+"""
+
+from pathlib import Path
+import xml.etree.ElementTree as ET
+from typing import Dict, Tuple, Set, List
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+
+
+# ----------------------
+# CONFIG
+# ----------------------
+
+BASE = Path.home()
+GRAPH_DIR = BASE / "Real_Data" / "out_graphs"
+META_PATH = BASE / "Real_Data" / "hmp2_metadata.csv"
+OUT_DIR = BASE / "Real_Data" / "Ricci_Summary"
+
+WEIGHT_KEY = "d1"
+
+
+# ----------------------
+# BASIC HELPERS
+# ----------------------
+
+def norm_cond(x: str) -> str:
+    s = str(x).strip().lower()
+
+    if "crohn" in s:
+        return "cd"
+    if "ulcerative" in s:
+        return "uc"
+    if "non" in s:
+        return "nonibd"
+
+    return s
+
+
+def parse_graphml_active_edges(path: Path) -> Tuple[Set[str], List[Tuple[str, str, float]]]:
+    """
+    Fast XML parse of one GraphML file.
+
+    Returns:
+      nodes:
+        all node IDs appearing in the GraphML file
+
+      active_edges:
+        directed edges (u, v, w) with w != 1
+    """
+    nodes: Set[str] = set()
+    active_edges: List[Tuple[str, str, float]] = []
+
+    for _, elem in ET.iterparse(path, events=("end",)):
+        tag = elem.tag.rsplit("}", 1)[-1]
+
+        if tag == "node":
+            nid = elem.attrib.get("id")
+            if nid is not None:
+                nodes.add(nid)
+            elem.clear()
+
+        elif tag == "edge":
+            u = elem.attrib.get("source")
+            v = elem.attrib.get("target")
+
+            if u is not None:
+                nodes.add(u)
+            if v is not None:
+                nodes.add(v)
+
+            w = None
+            for child in elem:
+                ctag = child.tag.rsplit("}", 1)[-1]
+                if ctag == "data" and child.attrib.get("key") == WEIGHT_KEY:
+                    try:
+                        w = float(child.text)
+                    except Exception:
+                        w = None
+                    break
+
+            if u is not None and v is not None and w is not None and w != 1.0:
+                active_edges.append((u, v, float(w)))
+
+            elem.clear()
+
+    return nodes, active_edges
+
+
+def build_active_digraph(
+    nodes: Set[str],
+    active_edges: List[Tuple[str, str, float]],
+    active_vertices_only: bool = True,
+) -> nx.DiGraph:
+    """
+    Build directed graph with:
+      - raw biological graph weight stored as 'weight'
+      - transformed support strength stored as 'strength', where strength = 1 - w
+
+    If active_vertices_only=True, only vertices incident to at least one active edge
+    are included. This matches the "active metabolic network" interpretation.
+    """
+    G = nx.DiGraph()
+
+    if active_vertices_only:
+        active_nodes: Set[str] = set()
+        for u, v, _w in active_edges:
+            active_nodes.add(u)
+            active_nodes.add(v)
+        G.add_nodes_from(active_nodes)
+    else:
+        G.add_nodes_from(nodes)
+
+    for u, v, w in active_edges:
+        strength = 1.0 - float(w)
+
+        # Safety clamp for floating-point oddities.
+        if strength < 0.0:
+            strength = 0.0
+        if strength > 1.0:
+            strength = 1.0
+
+        G.add_edge(u, v, weight=float(w), strength=float(strength))
+
+    return G
+
+
+def directed_clustering_values(G: nx.DiGraph) -> Tuple[float, float]:
+    """
+    Compute unweighted and weighted directed clustering.
+
+    Unweighted:
+      nx.clustering(G) for DiGraph.
+
+    Weighted:
+      nx.clustering(G, weight="strength"), where strength = 1 - w.
+    """
+    if G.number_of_nodes() == 0 or G.number_of_edges() == 0:
+        return np.nan, np.nan
+
+    unweighted_local = nx.clustering(G)
+    directed_clustering = (
+        float(np.mean(list(unweighted_local.values())))
+        if unweighted_local else np.nan
+    )
+
+    weighted_local = nx.clustering(G, weight="strength")
+    weighted_directed_clustering = (
+        float(np.mean(list(weighted_local.values())))
+        if weighted_local else np.nan
+    )
+
+    return directed_clustering, weighted_directed_clustering
+
+
+def summarise_by_group(df: pd.DataFrame, level_name: str) -> pd.DataFrame:
+    rows = []
+
+    for cond in ["overall", "cd", "uc", "nonibd"]:
+        if cond == "overall":
+            sub = df.copy()
+        else:
+            sub = df[df["cond"] == cond].copy()
+
+        rows.append({
+            "level": level_name,
+            "cond": cond,
+            "n": int(len(sub)),
+            "mean_directed_clustering": float(sub["directed_clustering"].mean()) if len(sub) else np.nan,
+            "sd_directed_clustering": float(sub["directed_clustering"].std(ddof=0)) if len(sub) else np.nan,
+            "mean_weighted_directed_clustering": float(sub["weighted_directed_clustering"].mean()) if len(sub) else np.nan,
+            "sd_weighted_directed_clustering": float(sub["weighted_directed_clustering"].std(ddof=0)) if len(sub) else np.nan,
+            "mean_active_vertices": float(sub["n_active_vertices"].mean()) if len(sub) else np.nan,
+            "sd_active_vertices": float(sub["n_active_vertices"].std(ddof=0)) if len(sub) else np.nan,
+            "mean_active_edges": float(sub["n_active_edges"].mean()) if len(sub) else np.nan,
+            "sd_active_edges": float(sub["n_active_edges"].std(ddof=0)) if len(sub) else np.nan,
+            "mean_samples_per_participant": float(sub["n_samples_for_participant"].mean()) if "n_samples_for_participant" in sub.columns and len(sub) else np.nan,
+        })
+
+    return pd.DataFrame(rows)
+
+
+# ----------------------
+# MAIN
+# ----------------------
+
+def main():
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("Loading metadata...")
+
+    meta = pd.read_csv(META_PATH, low_memory=False)
+    meta = meta[["External ID", "diagnosis", "Participant ID"]].copy()
+    meta.columns = ["ExternalID", "Diagnosis", "ParticipantID"]
+    meta["cond"] = meta["Diagnosis"].apply(norm_cond)
+    meta = meta[meta["cond"].isin(["cd", "uc", "nonibd"])].copy()
+
+    # Critical integrity step: one row per external sample ID.
+    meta = meta.drop_duplicates(subset=["ExternalID"]).copy()
+
+    graph_files = {p.stem: p for p in GRAPH_DIR.glob("*.graphml")}
+    meta = meta[meta["ExternalID"].isin(graph_files)].copy()
+
+    print("Unique graphs used:", len(meta))
+    print("Unique participants used:", meta["ParticipantID"].nunique())
+    print("Graphs per condition:")
+    print(meta["cond"].value_counts().to_string())
+
+    # Participant condition by mode.
+    pid_cond = (
+        meta.groupby("ParticipantID")["cond"]
+        .agg(lambda x: x.value_counts().idxmax())
+        .to_dict()
+    )
+
+    # ----------------------
+    # SAMPLE-LEVEL RESULTS
+    # ----------------------
+
+    sample_rows = []
+
+    # For participant union graphs:
+    # For each participant and edge, accumulate:
+    #   - sum of observed active weights
+    #   - count of active occurrences
+    pid_edge_wsum: Dict[str, Dict[Tuple[str, str], float]] = {}
+    pid_edge_count: Dict[str, Dict[Tuple[str, str], int]] = {}
+    pid_sample_count: Dict[str, int] = {}
+
+    print("\nProcessing sample graphs...")
+
+    for i, (_, row) in enumerate(meta.iterrows(), start=1):
+        ext = row["ExternalID"]
+        pid = row["ParticipantID"]
+        cond = row["cond"]
+        path = graph_files[ext]
+
+        if i == 1 or i % 50 == 0:
+            print(f"  Sample graph {i}/{len(meta)}: {ext}")
+
+        nodes, active_edges = parse_graphml_active_edges(path)
+        G = build_active_digraph(nodes, active_edges, active_vertices_only=True)
+
+        directed_c, weighted_c = directed_clustering_values(G)
+
+        sample_rows.append({
+            "sample_id": ext,
+            "participant_id": pid,
+            "cond": cond,
+            "n_active_vertices": int(G.number_of_nodes()),
+            "n_active_edges": int(G.number_of_edges()),
+            "directed_clustering": directed_c,
+            "weighted_directed_clustering": weighted_c,
+        })
+
+        # Accumulate participant union graph data.
+        if pid not in pid_edge_wsum:
+            pid_edge_wsum[pid] = {}
+            pid_edge_count[pid] = {}
+            pid_sample_count[pid] = 0
+
+        pid_sample_count[pid] += 1
+
+        wsum = pid_edge_wsum[pid]
+        cnt = pid_edge_count[pid]
+
+        for u, v, w in active_edges:
+            e = (u, v)
+            wsum[e] = wsum.get(e, 0.0) + float(w)
+            cnt[e] = cnt.get(e, 0) + 1
+
+    sample_df = pd.DataFrame(sample_rows)
+    sample_csv = OUT_DIR / "directed_clustering_active_sample_level.csv"
+    sample_df.to_csv(sample_csv, index=False)
+
+    # ----------------------
+    # PARTICIPANT UNION RESULTS
+    # ----------------------
+
+    part_rows = []
+
+    print("\nProcessing participant union graphs...")
+
+    pids = sorted(pid_edge_wsum.keys())
+
+    for j, pid in enumerate(pids, start=1):
+        if j == 1 or j % 10 == 0:
+            print(f"  Participant graph {j}/{len(pids)}: {pid}")
+
+        union_edges: List[Tuple[str, str, float]] = []
+        union_nodes: Set[str] = set()
+
+        for e, wsum in pid_edge_wsum[pid].items():
+            active_count = pid_edge_count[pid][e]
+
+            # Correct participant union weight:
+            # average only over samples where the edge is active/present.
+            mean_w_when_present = wsum / active_count
+
+            u, v = e
+            union_edges.append((u, v, float(mean_w_when_present)))
+            union_nodes.add(u)
+            union_nodes.add(v)
+
+        Gp = build_active_digraph(union_nodes, union_edges, active_vertices_only=True)
+
+        directed_c, weighted_c = directed_clustering_values(Gp)
+
+        part_rows.append({
+            "participant_id": pid,
+            "cond": pid_cond.get(pid, "unknown"),
+            "n_samples_for_participant": int(pid_sample_count[pid]),
+            "n_active_vertices": int(Gp.number_of_nodes()),
+            "n_active_edges": int(Gp.number_of_edges()),
+            "directed_clustering": directed_c,
+            "weighted_directed_clustering": weighted_c,
+        })
+
+    part_df = pd.DataFrame(part_rows)
+    part_csv = OUT_DIR / "directed_clustering_participant_union_level.csv"
+    part_df.to_csv(part_csv, index=False)
+
+    # ----------------------
+    # SUMMARY
+    # ----------------------
+
+    summary_df = pd.concat([
+        summarise_by_group(sample_df, "sample"),
+        summarise_by_group(part_df, "participant_union"),
+    ], ignore_index=True)
+
+    summary_csv = OUT_DIR / "directed_clustering_active_union_summary.csv"
+    summary_df.to_csv(summary_csv, index=False)
+
+    print("\nSummary:")
+    print(summary_df.to_string(index=False))
+
+    print("\nWrote:")
+    print(" ", sample_csv)
+    print(" ", part_csv)
+    print(" ", summary_csv)
+
+
+if __name__ == "__main__":
+    main()
