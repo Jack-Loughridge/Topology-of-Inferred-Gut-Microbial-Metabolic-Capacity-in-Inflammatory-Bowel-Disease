@@ -1,0 +1,468 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Species-abundance baselines.
+
+Tasks:
+- 3way: nonIBD vs UC vs CD
+- CD_vs_UC: binary CD vs UC
+
+Models:
+1. Logistic Regression
+2. Random Forest
+3. XGBoost, if installed
+
+Safeguards:
+- one row per External ID
+- participant-grouped 5-fold CV
+- CLR transform inside each fold
+- scaling inside each fold
+- fold-specific sample weighting
+"""
+
+from pathlib import Path
+import warnings
+import copy
+import numpy as np
+import pandas as pd
+
+from sklearn.model_selection import StratifiedGroupKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
+    roc_auc_score,
+    confusion_matrix,
+    classification_report,
+)
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils.class_weight import compute_sample_weight
+
+warnings.filterwarnings("ignore")
+
+# ============================================================
+# CONFIG
+# ============================================================
+
+TASK = "CD_vs_UC"
+# TASK = "CD_vs_UC"
+
+RANDOM_SEED = 13
+N_SPLITS = 5
+EPS = 1e-6
+
+BASE = Path.home() / "Real_Data"
+
+SPECIES_FILE = BASE / "Real_Species_Abundances_canon.xlsx"
+LABEL_FILE = BASE / "sample_labels.csv"
+META_FILE = BASE / "hmp2_metadata.csv"
+
+if TASK == "3way":
+    OUTDIR = BASE / "Species_Only_Baselines_Balanced_3way"
+    CLASS_ORDER = ["nonIBD", "UC", "CD"]
+    AUC_COL = "macro_roc_auc_ovr"
+elif TASK == "CD_vs_UC":
+    OUTDIR = BASE / "Species_Only_Baselines_Balanced_CD_vs_UC"
+    CLASS_ORDER = ["CD", "UC"]
+    AUC_COL = "roc_auc_UC_vs_CD"
+else:
+    raise ValueError("TASK must be '3way' or 'CD_vs_UC'.")
+
+OUTDIR.mkdir(exist_ok=True)
+
+# ============================================================
+# HELPERS
+# ============================================================
+
+def normalise_label(x):
+    x = str(x).strip()
+    xl = x.lower()
+
+    if xl == "cd":
+        return "CD"
+    if xl == "uc":
+        return "UC"
+    if xl in {"nonibd", "non-ibd", "control", "healthy"}:
+        return "nonIBD"
+
+    return None
+
+
+def clr_transform(X, eps=1e-6):
+    X = np.asarray(X, dtype=float)
+    X = np.clip(X, 0, None)
+    X = X + eps
+    logX = np.log(X)
+    return logX - logX.mean(axis=1, keepdims=True)
+
+
+def fit_model_with_weights(model_name, model, X_train, y_train, sample_weight, n_classes):
+    model = copy.deepcopy(model)
+
+    if model_name == "xgboost":
+        if n_classes == 2:
+            n_neg = np.sum(y_train == 0)
+            n_pos = np.sum(y_train == 1)
+            model.set_params(
+                objective="binary:logistic",
+                eval_metric="auc",
+                scale_pos_weight=n_neg / max(n_pos, 1),
+            )
+        else:
+            model.set_params(
+                objective="multi:softprob",
+                eval_metric="mlogloss",
+                num_class=n_classes,
+            )
+
+        model.fit(
+            X_train,
+            y_train,
+            sample_weight=sample_weight,
+            verbose=False,
+        )
+    else:
+        try:
+            model.fit(X_train, y_train, sample_weight=sample_weight)
+        except TypeError:
+            model.fit(X_train, y_train)
+
+    return model
+
+
+def evaluate_model(model_name, model, X, y, groups, sample_ids, class_names):
+    print("\n" + "=" * 100)
+    print(f"RUNNING MODEL: {model_name} | TASK: {TASK}")
+    print("=" * 100)
+
+    n_classes = len(class_names)
+
+    cv = StratifiedGroupKFold(
+        n_splits=N_SPLITS,
+        shuffle=True,
+        random_state=RANDOM_SEED,
+    )
+
+    rows = []
+    pred_rows = []
+
+    all_true = []
+    all_pred = []
+    all_prob_rows = []
+
+    for fold, (train_idx, test_idx) in enumerate(cv.split(X, y, groups), start=1):
+
+        X_train_raw = X[train_idx]
+        X_test_raw = X[test_idx]
+        y_train = y[train_idx]
+        y_test = y[test_idx]
+
+        # Leakage-safe preprocessing
+        X_train_clr = clr_transform(X_train_raw, EPS)
+        X_test_clr = clr_transform(X_test_raw, EPS)
+
+        selector = VarianceThreshold(threshold=1e-10)
+        X_train_sel = selector.fit_transform(X_train_clr)
+        X_test_sel = selector.transform(X_test_clr)
+
+        scaler = StandardScaler()
+        X_train_proc = scaler.fit_transform(X_train_sel)
+        X_test_proc = scaler.transform(X_test_sel)
+
+        sample_weight = compute_sample_weight(
+            class_weight="balanced",
+            y=y_train,
+        )
+
+        fitted_model = fit_model_with_weights(
+            model_name=model_name,
+            model=model,
+            X_train=X_train_proc,
+            y_train=y_train,
+            sample_weight=sample_weight,
+            n_classes=n_classes,
+        )
+
+        prob = fitted_model.predict_proba(X_test_proc)
+
+        if n_classes == 2:
+            prob_for_auc = prob[:, 1]
+            pred = (prob_for_auc >= 0.5).astype(int)
+            auc = roc_auc_score(y_test, prob_for_auc)
+        else:
+            pred = np.argmax(prob, axis=1)
+            auc = roc_auc_score(
+                y_test,
+                prob,
+                multi_class="ovr",
+                average="macro",
+                labels=np.arange(n_classes),
+            )
+
+        acc = accuracy_score(y_test, pred)
+        bal_acc = balanced_accuracy_score(y_test, pred)
+        macro_f1 = f1_score(y_test, pred, average="macro")
+
+        row = {
+            "model": model_name,
+            "fold": fold,
+            "n_train": len(train_idx),
+            "n_test": len(test_idx),
+            "n_train_participants": len(np.unique(groups[train_idx])),
+            "n_test_participants": len(np.unique(groups[test_idx])),
+            "accuracy": acc,
+            "balanced_accuracy": bal_acc,
+            "macro_f1": macro_f1,
+            AUC_COL: auc,
+        }
+
+        rows.append(row)
+
+        for i, sid in enumerate(sample_ids[test_idx]):
+            pred_row = {
+                "model": model_name,
+                "fold": fold,
+                "sample_id": sid,
+                "true_label": class_names[y_test[i]],
+                "pred_label": class_names[pred[i]],
+            }
+
+            for j, cname in enumerate(class_names):
+                pred_row[f"prob_{cname}"] = prob[i, j]
+
+            pred_rows.append(pred_row)
+
+        all_true.extend(y_test.tolist())
+        all_pred.extend(pred.tolist())
+        all_prob_rows.extend(prob.tolist())
+
+        print(
+            f"[{model_name} | fold {fold}] "
+            f"acc={acc:.4f}, bal_acc={bal_acc:.4f}, "
+            f"macro_f1={macro_f1:.4f}, auc={auc:.4f}"
+        )
+
+    cv_df = pd.DataFrame(rows)
+    pred_df = pd.DataFrame(pred_rows)
+
+    cm = confusion_matrix(
+        all_true,
+        all_pred,
+        labels=np.arange(n_classes),
+    )
+
+    cm_df = pd.DataFrame(
+        cm,
+        index=[f"true_{c}" for c in class_names],
+        columns=[f"pred_{c}" for c in class_names],
+    )
+
+    model_dir = OUTDIR / model_name.replace(" ", "_")
+    model_dir.mkdir(exist_ok=True)
+
+    cv_df.to_csv(model_dir / "cv_results.csv", index=False)
+    pred_df.to_csv(model_dir / "predictions.csv", index=False)
+    cm_df.to_csv(model_dir / "confusion_matrix.csv")
+
+    print("\nMean:")
+    print(cv_df[["accuracy", "balanced_accuracy", "macro_f1", AUC_COL]].mean())
+
+    print("\nStd:")
+    print(cv_df[["accuracy", "balanced_accuracy", "macro_f1", AUC_COL]].std())
+
+    print("\nConfusion matrix:")
+    print(cm_df)
+
+    print("\nClassification report:")
+    print(
+        classification_report(
+            all_true,
+            all_pred,
+            target_names=class_names,
+        )
+    )
+
+    return cv_df, pred_df, cm_df
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+print("\nLoading species abundances...")
+species = pd.read_excel(SPECIES_FILE, sheet_name="Sheet1")
+
+if "External ID" not in species.columns:
+    raise ValueError("Species file must contain an 'External ID' column.")
+
+print("Raw species rows:", len(species))
+print("Unique External IDs:", species["External ID"].nunique())
+
+feature_cols = [c for c in species.columns if c != "External ID"]
+
+species[feature_cols] = (
+    species[feature_cols]
+    .apply(pd.to_numeric, errors="coerce")
+    .fillna(0)
+)
+
+species = (
+    species
+    .groupby("External ID", as_index=False)[feature_cols]
+    .mean()
+)
+
+print("After duplicate aggregation:", species.shape)
+
+labels = pd.read_csv(LABEL_FILE)
+sample_col = labels.columns[0]
+label_col = [c for c in labels.columns if "label" in c.lower()][0]
+
+labels = labels[[sample_col, label_col]].copy()
+labels.columns = ["External ID", "label"]
+labels["label"] = labels["label"].map(normalise_label)
+labels = labels.dropna(subset=["label"])
+labels = labels[labels["label"].isin(CLASS_ORDER)]
+
+meta = pd.read_csv(META_FILE, low_memory=False)
+
+external_col = None
+participant_col = None
+
+for c in meta.columns:
+    cl = c.lower()
+    if external_col is None and "external" in cl:
+        external_col = c
+    if participant_col is None and "participant" in cl:
+        participant_col = c
+
+if external_col is None or participant_col is None:
+    raise ValueError("Could not find External ID / Participant ID columns in metadata.")
+
+meta = meta[[external_col, participant_col]].copy()
+meta.columns = ["External ID", "Participant ID"]
+meta = meta.drop_duplicates("External ID")
+
+df = species.merge(labels, on="External ID", how="inner")
+df = df.merge(meta, on="External ID", how="left")
+df = df.dropna(subset=["Participant ID"])
+
+df["label"] = pd.Categorical(
+    df["label"],
+    categories=CLASS_ORDER,
+    ordered=True,
+)
+
+df = df.sort_values(["label", "External ID"]).reset_index(drop=True)
+
+print("\nMerged shape:", df.shape)
+print("Unique samples:", df["External ID"].nunique())
+print("Participants:", df["Participant ID"].nunique())
+print("\nClass counts:")
+print(df["label"].value_counts())
+
+label_to_int = {c: i for i, c in enumerate(CLASS_ORDER)}
+
+X = df[feature_cols].to_numpy(dtype=float)
+y = df["label"].map(label_to_int).astype(int).to_numpy()
+groups = df["Participant ID"].astype(str).to_numpy()
+sample_ids = df["External ID"].astype(str).to_numpy()
+
+# ============================================================
+# MODELS
+# ============================================================
+
+models = {}
+
+models["logistic_regression_l1"] = LogisticRegression(
+    penalty="l1",
+    solver="saga",
+    C=0.2,
+    class_weight=None,
+    max_iter=10000,
+    tol=1e-4,
+    random_state=RANDOM_SEED,
+    n_jobs=-1,
+)
+
+models["random_forest"] = RandomForestClassifier(
+    n_estimators=1000,
+    max_depth=None,
+    min_samples_leaf=3,
+    max_features="sqrt",
+    class_weight=None,
+    random_state=RANDOM_SEED,
+    n_jobs=-1,
+)
+
+try:
+    from xgboost import XGBClassifier
+
+    models["xgboost"] = XGBClassifier(
+        n_estimators=700,
+        max_depth=3,
+        learning_rate=0.02,
+        subsample=0.85,
+        colsample_bytree=0.85,
+        reg_lambda=2.0,
+        reg_alpha=0.25,
+        random_state=RANDOM_SEED,
+        n_jobs=-1,
+    )
+
+except Exception as e:
+    print("\n[warning] xgboost not available, skipping XGBoost.")
+    print("Install with: pip install xgboost")
+    print("Reason:", e)
+
+# ============================================================
+# RUN MODELS
+# ============================================================
+
+all_cv = []
+
+for model_name, model in models.items():
+    cv_df, pred_df, cm_df = evaluate_model(
+        model_name=model_name,
+        model=model,
+        X=X,
+        y=y,
+        groups=groups,
+        sample_ids=sample_ids,
+        class_names=CLASS_ORDER,
+    )
+    all_cv.append(cv_df)
+
+all_cv = pd.concat(all_cv, ignore_index=True)
+all_cv.to_csv(OUTDIR / "all_model_cv_results.csv", index=False)
+
+summary = (
+    all_cv
+    .groupby("model")
+    .agg(
+        accuracy_mean=("accuracy", "mean"),
+        accuracy_std=("accuracy", "std"),
+        balanced_accuracy_mean=("balanced_accuracy", "mean"),
+        balanced_accuracy_std=("balanced_accuracy", "std"),
+        macro_f1_mean=("macro_f1", "mean"),
+        macro_f1_std=("macro_f1", "std"),
+        auc_mean=(AUC_COL, "mean"),
+        auc_std=(AUC_COL, "std"),
+    )
+    .reset_index()
+    .sort_values("auc_mean", ascending=False)
+)
+
+summary.to_csv(OUTDIR / "model_summary.csv", index=False)
+
+print("\n" + "=" * 100)
+print("FINAL MODEL SUMMARY")
+print("=" * 100)
+print(summary.to_string(index=False))
+
+print("\nSaved all outputs to:")
+print(OUTDIR)
