@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import pandas as pd
+import numpy as np
+import re
+
+BASE = Path.home() / "Real_Data"
+RS = BASE / "Ricci_Summary"
+OVER = BASE / "overleaf_paste_ready_corrected_results_no_blanks"
+
+HOP_SAMPLE = RS / "shortest_path_hop_active_sample_level.csv"
+MINIMAX_SAMPLE = RS / "shortest_path_minimax_active_sample_level.csv"
+
+FINAL_TEX = OVER / "paste_ready_corrected_results_no_blanks_WITH_VALID_PATHS.tex"
+OUT_TEX = OVER / "paste_ready_corrected_results_no_blanks_WITH_VALID_PATHS_NO_PREPOOLED_PATHS.tex"
+
+HOP_OUT_CSV = RS / "shortest_path_hop_active_posthoc_participant_average_summary.csv"
+MINIMAX_OUT_CSV = RS / "shortest_path_minimax_active_posthoc_participant_average_summary.csv"
+PATH_BLOCK_OUT = OVER / "corrected_shortest_path_tables_no_prepooled_graphs.tex"
+
+
+def norm_cond(x):
+    s = str(x).strip().lower()
+    if "crohn" in s or s == "cd":
+        return "cd"
+    if "ulcerative" in s or s == "uc":
+        return "uc"
+    if "non" in s:
+        return "nonibd"
+    return s
+
+
+def fmt_cond(c):
+    return {"cd": "CD", "uc": "UC", "nonibd": "non-IBD"}.get(c, c)
+
+
+def mean_sd(sub, col):
+    vals = pd.to_numeric(sub[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if len(vals) == 0:
+        return "--"
+    if len(vals) == 1:
+        return f"{vals.iloc[0]:.3f}"
+    return f"{vals.mean():.3f} $\\pm$ {vals.std(ddof=0):.3f}"
+
+
+def participant_posthoc(df, metric_cols):
+    df = df.copy()
+    df["cond"] = df["cond"].map(norm_cond)
+
+    agg = {
+        "cond": lambda x: x.value_counts().idxmax(),
+        "sample_id": "count",
+    }
+    for c in metric_cols:
+        agg[c] = "mean"
+
+    part = (
+        df.groupby("participant_id", as_index=False)
+          .agg(agg)
+          .rename(columns={"sample_id": "n_samples_for_participant"})
+    )
+    return part
+
+
+def summarise_hop():
+    df = pd.read_csv(HOP_SAMPLE)
+    needed = [
+        "sample_id", "participant_id", "cond",
+        "mean_shortest_path_length",
+        "mean_squared_weight_on_paths",
+        "reachable_fraction_over_sampled_sources",
+    ]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise RuntimeError(f"Hop sample CSV missing columns: {missing}")
+
+    df["cond"] = df["cond"].map(norm_cond)
+    if len(df) < 1000 or df["participant_id"].nunique() < 100:
+        raise RuntimeError("Hop sample CSV looks incomplete.")
+
+    metric_cols = [
+        "mean_shortest_path_length",
+        "mean_squared_weight_on_paths",
+        "reachable_fraction_over_sampled_sources",
+    ]
+    part = participant_posthoc(df, metric_cols)
+
+    rows = []
+    for level, subdf in [("sample graphwise", df), ("participant average", part)]:
+        for cond in ["overall", "cd", "uc", "nonibd"]:
+            sub = subdf if cond == "overall" else subdf[subdf["cond"] == cond]
+            rows.append({
+                "level": level,
+                "cond": cond,
+                "n": int(len(sub)),
+                "path_length": mean_sd(sub, "mean_shortest_path_length"),
+                "mean_w2": mean_sd(sub, "mean_squared_weight_on_paths"),
+                "reachable_fraction": mean_sd(sub, "reachable_fraction_over_sampled_sources"),
+            })
+
+    out = pd.DataFrame(rows)
+    out.to_csv(HOP_OUT_CSV, index=False)
+    return out
+
+
+def summarise_minimax():
+    df = pd.read_csv(MINIMAX_SAMPLE)
+    needed = [
+        "sample_id", "participant_id", "cond",
+        "mean_minimax_path_length",
+        "mean_squared_weight_on_minimax_paths",
+        "mean_bottleneck_weight",
+        "reachable_fraction_over_sampled_sources",
+    ]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise RuntimeError(f"Minimax sample CSV missing columns: {missing}")
+
+    df["cond"] = df["cond"].map(norm_cond)
+    if len(df) < 1000 or df["participant_id"].nunique() < 100:
+        raise RuntimeError("Minimax sample CSV looks incomplete.")
+
+    metric_cols = [
+        "mean_minimax_path_length",
+        "mean_squared_weight_on_minimax_paths",
+        "mean_bottleneck_weight",
+        "reachable_fraction_over_sampled_sources",
+    ]
+    part = participant_posthoc(df, metric_cols)
+
+    rows = []
+    for level, subdf in [("sample graphwise", df), ("participant average", part)]:
+        for cond in ["overall", "cd", "uc", "nonibd"]:
+            sub = subdf if cond == "overall" else subdf[subdf["cond"] == cond]
+            rows.append({
+                "level": level,
+                "cond": cond,
+                "n": int(len(sub)),
+                "path_length": mean_sd(sub, "mean_minimax_path_length"),
+                "mean_w2": mean_sd(sub, "mean_squared_weight_on_minimax_paths"),
+                "bottleneck": mean_sd(sub, "mean_bottleneck_weight"),
+                "reachable_fraction": mean_sd(sub, "reachable_fraction_over_sampled_sources"),
+            })
+
+    out = pd.DataFrame(rows)
+    out.to_csv(MINIMAX_OUT_CSV, index=False)
+    return out
+
+
+def latex_hop_table(df):
+    lines = []
+    lines.append(r"\subsubsection*{Directed shortest-path diagnostics: minimum-hop}")
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\caption{Directed minimum-hop path diagnostics on active metabolic graphs. Sample-level rows are computed on individual sample graphs. Participant-average rows are obtained by first averaging sample-level path diagnostics within participant, and then reporting mean $\pm$ SD across participants by condition.}")
+    lines.append(r"\label{tab:directed_minimum_hop_paths_participant_average}")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(r"\begin{tabular}{llrrrr}")
+    lines.append(r"\toprule")
+    lines.append(r"Level & Condition & $n$ & Path length & Mean $w^2$ on path & Reachable fraction \\")
+    lines.append(r"\midrule")
+    for _, r in df.iterrows():
+        lines.append(
+            f"{r['level']} & {fmt_cond(r['cond'])} & {int(r['n'])} & "
+            f"{r['path_length']} & {r['mean_w2']} & {r['reachable_fraction']} \\\\"
+        )
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}%")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
+def latex_minimax_table(df):
+    lines = []
+    lines.append(r"\subsubsection*{Directed shortest-path diagnostics: minimax}")
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\caption{Directed minimax path diagnostics on active metabolic graphs. Paths minimise the maximum edge weight along the path, with shortest-path tie-breaking. Sample-level rows are computed on individual sample graphs. Participant-average rows are obtained by first averaging sample-level path diagnostics within participant, and then reporting mean $\pm$ SD across participants by condition.}")
+    lines.append(r"\label{tab:directed_minimax_paths_participant_average}")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(r"\begin{tabular}{llrrrrr}")
+    lines.append(r"\toprule")
+    lines.append(r"Level & Condition & $n$ & Path length & Mean $w^2$ & Bottleneck weight & Reachable fraction \\")
+    lines.append(r"\midrule")
+    for _, r in df.iterrows():
+        lines.append(
+            f"{r['level']} & {fmt_cond(r['cond'])} & {int(r['n'])} & "
+            f"{r['path_length']} & {r['mean_w2']} & {r['bottleneck']} & {r['reachable_fraction']} \\\\"
+        )
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}%")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
+def main():
+    hop = summarise_hop()
+    minimax = summarise_minimax()
+
+    block = latex_hop_table(hop) + "\n\n" + latex_minimax_table(minimax) + "\n"
+    PATH_BLOCK_OUT.write_text(block)
+
+    print("Corrected hop summary:")
+    print(hop.to_string(index=False))
+    print("\nCorrected minimax summary:")
+    print(minimax.to_string(index=False))
+
+    print("\nWrote:")
+    print(" ", HOP_OUT_CSV)
+    print(" ", MINIMAX_OUT_CSV)
+    print(" ", PATH_BLOCK_OUT)
+
+    if FINAL_TEX.exists():
+        tex = FINAL_TEX.read_text()
+        start = tex.find(r"\subsubsection*{Directed shortest-path diagnostics: minimum-hop}")
+        end = tex.find(r"\subsubsection*{Directed clustering diagnostics}")
+
+        if start == -1 or end == -1 or end <= start:
+            raise RuntimeError("Could not locate shortest-path block boundaries in final TeX.")
+
+        new_tex = tex[:start] + block + "\n" + tex[end:]
+        bad_patterns = ["participant-mean active graph", "finite full-dataset shortest-path CSV outputs", "smoke-test", "broken LaTeX wrappers"]
+        for pat in bad_patterns:
+            if pat in new_tex:
+                raise RuntimeError(f"Bad audit/method phrase still present in TeX: {pat}")
+
+        if re.search(r"\bnan\b", new_tex, flags=re.IGNORECASE):
+            raise RuntimeError("Final TeX still contains nan.")
+
+        OUT_TEX.write_text(new_tex)
+        print("\nUpdated final TeX:")
+        print(" ", OUT_TEX)
+
+    print("\n[READY] Shortest-path tables now use sample-level diagnostics averaged post hoc within participant.")
+    print("Use this TeX file:")
+    print(" ", OUT_TEX)
+
+
+if __name__ == "__main__":
+    main()
+PY
