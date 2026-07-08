@@ -1,0 +1,1136 @@
+#!/usr/bin/env python3
+"""
+Long-range directed path-backbone diagnostics for active metabolic digraphs.
+
+Methodological protocol:
+  1. Compute diagnostics separately on each sample graph.
+  2. Average resulting sample-level diagnostics within participant.
+  3. Summarise participant-level values across participants by condition.
+
+No condition-level, participant-level, or pooled averaged graph is constructed before
+computing the path diagnostics.
+
+For each sample graph:
+  - Remove inactive edges, defined as w >= 1 - active_tol.
+  - Use the active directed graph and active vertices only.
+  - Sample unique source vertices with positive out-degree.
+  - For each source, sample unique reachable target vertices.
+  - Compute one path per unique ordered source-target pair.
+  - Different source-target paths are allowed to share edges; that repeated edge
+    use is the signal measured by the edge-concentration diagnostic.
+  - The same ordered source-target pairs are used for minimum-hop and minimax paths.
+
+Path diagnostics:
+  - minimum-hop path:
+      shortest directed path in number of edges.
+  - minimax path:
+      path minimising max_{e in p} w(e), with path-length tie-breaking.
+
+For each path p:
+  - path_length = number of directed edges.
+  - bottleneck_w = max_{e in p} w(e).
+      Lower is better because lower w means stronger inferred support.
+  - min_support = 1 - bottleneck_w.
+      Higher is better.
+  - mean_w2 = mean_{e in p} w(e)^2.
+
+Long-range paths:
+  - Defined by the minimum-hop path length being at least --long-min-hop.
+  - Default: long_min_hop = 4.
+
+Edge-concentration diagnostics:
+  - Count all directed edge traversals across sampled paths.
+  - Rank active directed edges by traversal count.
+  - Report the fraction of all path-edge traversals carried by the top
+    1%, 5%, and 10% of active directed edges.
+  - Also report support statistics among the positively used edges inside
+    those top-used sets.
+
+Outputs:
+  OUT_DIR/sample_results/*.json
+  OUT_DIR/path_backbone_sample_path_quantiles.csv
+  OUT_DIR/path_backbone_sample_edge_concentration.csv
+  OUT_DIR/path_backbone_participant_path_quantiles.csv
+  OUT_DIR/path_backbone_participant_edge_concentration.csv
+  OUT_DIR/path_backbone_condition_path_summary.csv
+  OUT_DIR/path_backbone_condition_edge_summary.csv
+  OUT_DIR/latex_*.tex
+  OUT_DIR/run_config.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import heapq
+import json
+import math
+import os
+import re
+import tempfile
+import time
+import traceback
+import xml.etree.ElementTree as ET
+from collections import Counter, deque
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Dict, Iterable, List, Tuple, Any, Optional
+
+import numpy as np
+import pandas as pd
+
+
+# -----------------------------
+# Defaults
+# -----------------------------
+
+DEFAULT_QUANTILES = [1, 5, 10, 20, 30, 50, 70, 80, 90, 95, 99]
+TOP_EDGE_FRACTIONS = [0.01, 0.05, 0.10]
+WEIGHT_KEY_CANDIDATES = {"weight", "d1", "Weight", "D1"}
+
+
+# -----------------------------
+# Small helpers
+# -----------------------------
+
+def norm_cond(x: Any) -> str:
+    s = str(x).strip().lower()
+    if "crohn" in s or s == "cd":
+        return "cd"
+    if "ulcerative" in s or s == "uc":
+        return "uc"
+    if "non" in s:
+        return "nonibd"
+    return s
+
+
+def display_cond(c: str) -> str:
+    return {"cd": "CD", "uc": "UC", "nonibd": "non-IBD", "overall": "overall"}.get(c, c)
+
+
+def safe_stem(s: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(s))
+
+
+def stable_seed(global_seed: int, sample_id: str) -> int:
+    h = hashlib.sha256(f"{global_seed}::{sample_id}".encode("utf-8")).hexdigest()
+    return int(h[:16], 16) % (2**32)
+
+
+def finite_float(x: Any) -> Optional[float]:
+    try:
+        y = float(x)
+    except Exception:
+        return None
+    if math.isfinite(y):
+        return y
+    return None
+
+
+def atomic_write_json(path: Path, obj: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent), suffix=".tmp") as f:
+        json.dump(obj, f)
+        tmp = Path(f.name)
+    tmp.replace(path)
+
+
+def quantile_dict(values: List[float], prefix: str, qs: List[int]) -> Dict[str, float]:
+    if len(values) == 0:
+        return {f"{prefix}_q{q}": np.nan for q in qs}
+
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+
+    if len(arr) == 0:
+        return {f"{prefix}_q{q}": np.nan for q in qs}
+
+    out = {}
+    for q in qs:
+        out[f"{prefix}_q{q}"] = float(np.percentile(arr, q))
+    return out
+
+
+def mean_or_nan(values: List[float]) -> float:
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
+        return np.nan
+    return float(np.mean(arr))
+
+
+def std_or_nan(values: List[float]) -> float:
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
+        return np.nan
+    return float(np.std(arr, ddof=0))
+
+
+# -----------------------------
+# GraphML parsing
+# -----------------------------
+
+def parse_graphml_active_digraph(
+    path: Path,
+    active_tol: float,
+) -> Tuple[List[str], Dict[str, List[str]], Dict[Tuple[str, str], float]]:
+    """
+    Parse one GraphML file into an active directed adjacency list.
+
+    Active edge criterion:
+      w < 1 - active_tol
+
+    Duplicate directed edges, if any, are collapsed by retaining the smaller w,
+    i.e. the stronger inferred support.
+    """
+    key_id_to_name: Dict[str, str] = {}
+    weight_key_ids = set(WEIGHT_KEY_CANDIDATES)
+
+    nodes = set()
+    edge_min_w: Dict[Tuple[str, str], float] = {}
+
+    for _, elem in ET.iterparse(path, events=("end",)):
+        tag = elem.tag.rsplit("}", 1)[-1]
+
+        if tag == "key":
+            kid = elem.attrib.get("id")
+            attr_name = elem.attrib.get("attr.name")
+            if kid is not None and attr_name is not None:
+                key_id_to_name[kid] = attr_name
+                if kid in WEIGHT_KEY_CANDIDATES or attr_name in WEIGHT_KEY_CANDIDATES:
+                    weight_key_ids.add(kid)
+            elem.clear()
+
+        elif tag == "node":
+            nid = elem.attrib.get("id")
+            if nid is not None:
+                nodes.add(nid)
+            elem.clear()
+
+        elif tag == "edge":
+            u = elem.attrib.get("source")
+            v = elem.attrib.get("target")
+            if u is not None:
+                nodes.add(u)
+            if v is not None:
+                nodes.add(v)
+
+            w = None
+            for child in elem:
+                ctag = child.tag.rsplit("}", 1)[-1]
+                if ctag != "data":
+                    continue
+
+                k = child.attrib.get("key")
+                k_name = key_id_to_name.get(k, k)
+
+                if k in weight_key_ids or k_name in WEIGHT_KEY_CANDIDATES:
+                    w = finite_float(child.text)
+                    break
+
+            if u is not None and v is not None and w is not None:
+                if w < 1.0 - active_tol:
+                    e = (u, v)
+                    if e not in edge_min_w or w < edge_min_w[e]:
+                        edge_min_w[e] = float(w)
+
+            elem.clear()
+
+    active_nodes = set()
+    for u, v in edge_min_w:
+        active_nodes.add(u)
+        active_nodes.add(v)
+
+    adjacency: Dict[str, List[str]] = {n: [] for n in active_nodes}
+    for u, v in edge_min_w:
+        adjacency.setdefault(u, []).append(v)
+        adjacency.setdefault(v, adjacency.get(v, []))
+
+    for u in adjacency:
+        adjacency[u].sort()
+
+    return sorted(active_nodes), adjacency, edge_min_w
+
+
+# -----------------------------
+# Shortest path routines
+# -----------------------------
+
+def bfs_paths_from_source(
+    adjacency: Dict[str, List[str]],
+    source: str,
+) -> Dict[str, List[str]]:
+    """
+    Single-source unweighted directed shortest paths by BFS.
+    Returns one shortest path to each reachable vertex.
+    """
+    pred: Dict[str, Optional[str]] = {source: None}
+    q = deque([source])
+
+    while q:
+        u = q.popleft()
+        for v in adjacency.get(u, []):
+            if v not in pred:
+                pred[v] = u
+                q.append(v)
+
+    paths: Dict[str, List[str]] = {}
+
+    for target in pred:
+        if target == source:
+            continue
+        rev = [target]
+        cur = target
+        while pred[cur] is not None:
+            cur = pred[cur]
+            rev.append(cur)
+        paths[target] = list(reversed(rev))
+
+    return paths
+
+
+def minimax_paths_from_source(
+    adjacency: Dict[str, List[str]],
+    edge_w: Dict[Tuple[str, str], float],
+    source: str,
+    targets: set,
+) -> Dict[str, List[str]]:
+    """
+    Single-source minimax paths with path-length tie-breaking.
+
+    Cost is lexicographic:
+      (max edge weight along path, number of edges)
+
+    Stops once all requested targets are settled.
+    """
+    if not targets:
+        return {}
+
+    dist: Dict[str, Tuple[float, int]] = {source: (0.0, 0)}
+    pred: Dict[str, Optional[str]] = {source: None}
+    heap: List[Tuple[float, int, str]] = [(0.0, 0, source)]
+    settled = set()
+    remaining = set(targets)
+
+    while heap and remaining:
+        bottleneck, length, u = heapq.heappop(heap)
+
+        if u in settled:
+            continue
+
+        current = dist.get(u)
+        if current is None or current != (bottleneck, length):
+            continue
+
+        settled.add(u)
+
+        if u in remaining:
+            remaining.remove(u)
+
+        for v in adjacency.get(u, []):
+            w = edge_w[(u, v)]
+            nb = max(bottleneck, w)
+            nl = length + 1
+            old = dist.get(v)
+
+            if old is None or (nb, nl) < old:
+                dist[v] = (nb, nl)
+                pred[v] = u
+                heapq.heappush(heap, (nb, nl, v))
+
+    paths: Dict[str, List[str]] = {}
+
+    for target in targets:
+        if target not in pred:
+            continue
+
+        rev = [target]
+        cur = target
+
+        while pred[cur] is not None:
+            cur = pred[cur]
+            rev.append(cur)
+
+        paths[target] = list(reversed(rev))
+
+    return paths
+
+
+def path_metrics(path: List[str], edge_w: Dict[Tuple[str, str], float]) -> Dict[str, float]:
+    weights = [edge_w[(path[i], path[i + 1])] for i in range(len(path) - 1)]
+    if not weights:
+        return {
+            "path_length": np.nan,
+            "bottleneck_w": np.nan,
+            "min_support": np.nan,
+            "mean_w2": np.nan,
+        }
+
+    b = max(weights)
+    return {
+        "path_length": float(len(weights)),
+        "bottleneck_w": float(b),
+        "min_support": float(1.0 - b),
+        "mean_w2": float(np.mean(np.asarray(weights, dtype=float) ** 2)),
+    }
+
+
+def add_path_edges(counter: Counter, path: List[str]) -> None:
+    for i in range(len(path) - 1):
+        counter[(path[i], path[i + 1])] += 1
+
+
+# -----------------------------
+# Per-sample diagnostics
+# -----------------------------
+
+def summarise_paths(
+    metrics: List[Dict[str, float]],
+    base: Dict[str, Any],
+    quantiles: List[int],
+) -> Dict[str, Any]:
+    row = dict(base)
+    row["n_paths"] = int(len(metrics))
+
+    for metric_name in ["path_length", "bottleneck_w", "min_support", "mean_w2"]:
+        vals = [m[metric_name] for m in metrics if math.isfinite(float(m[metric_name]))]
+        row[f"{metric_name}_mean"] = mean_or_nan(vals)
+        row[f"{metric_name}_sd"] = std_or_nan(vals)
+        row.update(quantile_dict(vals, metric_name, quantiles))
+
+    return row
+
+
+def summarise_edge_concentration(
+    counter: Counter,
+    edge_w: Dict[Tuple[str, str], float],
+    base: Dict[str, Any],
+) -> Dict[str, Any]:
+    row = dict(base)
+
+    active_edges = list(edge_w.keys())
+    n_active_edges = len(active_edges)
+    total_traversals = int(sum(counter.values()))
+    used_edges = [e for e, c in counter.items() if c > 0]
+
+    row["total_edge_traversals"] = total_traversals
+    row["unique_edges_used"] = int(len(used_edges))
+    row["unique_edges_used_fraction_of_active"] = (
+        float(len(used_edges) / n_active_edges) if n_active_edges > 0 else np.nan
+    )
+
+    if total_traversals > 0:
+        shares = np.asarray([counter[e] / total_traversals for e in used_edges], dtype=float)
+        hhi = float(np.sum(shares ** 2))
+        row["edge_traversal_hhi"] = hhi
+        row["effective_edges"] = float(1.0 / hhi) if hhi > 0 else np.nan
+        row["effective_edges_fraction_of_active"] = (
+            float((1.0 / hhi) / n_active_edges) if hhi > 0 and n_active_edges > 0 else np.nan
+        )
+    else:
+        row["edge_traversal_hhi"] = np.nan
+        row["effective_edges"] = np.nan
+        row["effective_edges_fraction_of_active"] = np.nan
+
+    ranked_edges = sorted(active_edges, key=lambda e: counter.get(e, 0), reverse=True)
+
+    for frac in TOP_EDGE_FRACTIONS:
+        pct = int(round(frac * 100))
+        k = max(1, int(math.ceil(frac * n_active_edges))) if n_active_edges > 0 else 0
+        top_edges = ranked_edges[:k]
+        top_counts = [counter.get(e, 0) for e in top_edges]
+        top_used = [e for e in top_edges if counter.get(e, 0) > 0]
+
+        prefix = f"top{pct}pct"
+
+        row[f"{prefix}_n_active_edges_in_set"] = int(k)
+        row[f"{prefix}_n_positively_used_edges_in_set"] = int(len(top_used))
+        row[f"{prefix}_traversal_share"] = (
+            float(sum(top_counts) / total_traversals) if total_traversals > 0 else np.nan
+        )
+
+        if top_used:
+            ws = np.asarray([edge_w[e] for e in top_used], dtype=float)
+            supports = 1.0 - ws
+            counts = np.asarray([counter[e] for e in top_used], dtype=float)
+
+            row[f"{prefix}_mean_w_top_used"] = float(np.mean(ws))
+            row[f"{prefix}_median_w_top_used"] = float(np.median(ws))
+            row[f"{prefix}_mean_support_top_used"] = float(np.mean(supports))
+            row[f"{prefix}_median_support_top_used"] = float(np.median(supports))
+            row[f"{prefix}_usage_weighted_mean_w_top_used"] = float(np.average(ws, weights=counts))
+            row[f"{prefix}_usage_weighted_mean_support_top_used"] = float(np.average(supports, weights=counts))
+        else:
+            row[f"{prefix}_mean_w_top_used"] = np.nan
+            row[f"{prefix}_median_w_top_used"] = np.nan
+            row[f"{prefix}_mean_support_top_used"] = np.nan
+            row[f"{prefix}_median_support_top_used"] = np.nan
+            row[f"{prefix}_usage_weighted_mean_w_top_used"] = np.nan
+            row[f"{prefix}_usage_weighted_mean_support_top_used"] = np.nan
+
+    return row
+
+
+def process_one_sample(task: Dict[str, Any]) -> Dict[str, Any]:
+    sample_id = task["sample_id"]
+    participant_id = task["participant_id"]
+    cond = task["cond"]
+    graph_path = Path(task["graph_path"])
+
+    n_source = int(task["n_source"])
+    n_target = int(task["n_target"])
+    long_min_hop = int(task["long_min_hop"])
+    active_tol = float(task["active_tol"])
+    seed = int(task["seed"])
+    quantiles = list(task["quantiles"])
+
+    rng = np.random.default_rng(seed)
+
+    nodes, adjacency, edge_w = parse_graphml_active_digraph(graph_path, active_tol=active_tol)
+
+    n_active_vertices = len(nodes)
+    n_active_edges = len(edge_w)
+
+    base_common = {
+        "sample_id": sample_id,
+        "participant_id": participant_id,
+        "cond": cond,
+        "n_active_vertices": n_active_vertices,
+        "n_active_edges": n_active_edges,
+        "n_source_requested": n_source,
+        "n_target_requested_per_source": n_target,
+        "long_min_hop": long_min_hop,
+    }
+
+    if n_active_vertices == 0 or n_active_edges == 0:
+        path_rows = []
+        edge_rows = []
+        for mode in ["minimum_hop", "minimax"]:
+            for path_set in ["all", f"long_hop_ge{long_min_hop}"]:
+                b = dict(base_common)
+                b.update({
+                    "mode": mode,
+                    "path_set": path_set,
+                    "n_sources_sampled": 0,
+                    "n_ordered_source_target_pairs": 0,
+                    "mean_reachable_fraction_sampled_sources": np.nan,
+                })
+                path_rows.append(summarise_paths([], b, quantiles))
+                edge_rows.append(summarise_edge_concentration(Counter(), edge_w, b))
+        return {"sample_id": sample_id, "path_rows": path_rows, "edge_rows": edge_rows, "error": None}
+
+    candidate_sources = [u for u in nodes if len(adjacency.get(u, [])) > 0]
+
+    if len(candidate_sources) == 0:
+        sources = []
+    else:
+        source_count = min(n_source, len(candidate_sources))
+        sources = list(rng.choice(candidate_sources, size=source_count, replace=False))
+
+    hop_metrics_all: List[Dict[str, float]] = []
+    hop_metrics_long: List[Dict[str, float]] = []
+    minimax_metrics_all: List[Dict[str, float]] = []
+    minimax_metrics_long: List[Dict[str, float]] = []
+
+    hop_edge_counter_all = Counter()
+    hop_edge_counter_long = Counter()
+    minimax_edge_counter_all = Counter()
+    minimax_edge_counter_long = Counter()
+
+    reachable_fractions: List[float] = []
+    n_pairs = 0
+
+    for source in sources:
+        hop_paths_by_target = bfs_paths_from_source(adjacency, source)
+
+        reachable_targets = list(hop_paths_by_target.keys())
+        if not reachable_targets:
+            reachable_fractions.append(0.0)
+            continue
+
+        reachable_fractions.append(len(reachable_targets) / max(1, n_active_vertices - 1))
+
+        target_count = min(n_target, len(reachable_targets))
+        targets = list(rng.choice(reachable_targets, size=target_count, replace=False))
+        target_set = set(targets)
+        n_pairs += len(targets)
+
+        # First compute minimum-hop paths.
+        hop_long_targets = set()
+
+        for target in targets:
+            p = hop_paths_by_target[target]
+            m = path_metrics(p, edge_w)
+            hop_metrics_all.append(m)
+            add_path_edges(hop_edge_counter_all, p)
+
+            if m["path_length"] >= long_min_hop:
+                hop_metrics_long.append(m)
+                add_path_edges(hop_edge_counter_long, p)
+                hop_long_targets.add(target)
+
+        # Then compute minimax paths for the exact same ordered source-target pairs.
+        minimax_paths_by_target = minimax_paths_from_source(adjacency, edge_w, source, target_set)
+
+        for target in targets:
+            p = minimax_paths_by_target.get(target)
+            if p is None:
+                continue
+
+            m = path_metrics(p, edge_w)
+            minimax_metrics_all.append(m)
+            add_path_edges(minimax_edge_counter_all, p)
+
+            # Long-range set is defined by minimum-hop distance for the same source-target pair.
+            if target in hop_long_targets:
+                minimax_metrics_long.append(m)
+                add_path_edges(minimax_edge_counter_long, p)
+
+    mean_reachable_fraction = mean_or_nan(reachable_fractions)
+
+    path_rows = []
+    edge_rows = []
+
+    combos = [
+        ("minimum_hop", "all", hop_metrics_all, hop_edge_counter_all),
+        ("minimum_hop", f"long_hop_ge{long_min_hop}", hop_metrics_long, hop_edge_counter_long),
+        ("minimax", "all", minimax_metrics_all, minimax_edge_counter_all),
+        ("minimax", f"long_hop_ge{long_min_hop}", minimax_metrics_long, minimax_edge_counter_long),
+    ]
+
+    for mode, path_set, metrics, counter in combos:
+        b = dict(base_common)
+        b.update({
+            "mode": mode,
+            "path_set": path_set,
+            "n_sources_sampled": len(sources),
+            "n_ordered_source_target_pairs": n_pairs,
+            "mean_reachable_fraction_sampled_sources": mean_reachable_fraction,
+        })
+        path_rows.append(summarise_paths(metrics, b, quantiles))
+        edge_rows.append(summarise_edge_concentration(counter, edge_w, b))
+
+    return {"sample_id": sample_id, "path_rows": path_rows, "edge_rows": edge_rows, "error": None}
+
+
+def worker(task: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        return process_one_sample(task)
+    except Exception:
+        return {
+            "sample_id": task.get("sample_id"),
+            "path_rows": [],
+            "edge_rows": [],
+            "error": traceback.format_exc(),
+        }
+
+
+# -----------------------------
+# Aggregation and summaries
+# -----------------------------
+
+def load_all_sample_json(sample_dir: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    path_rows = []
+    edge_rows = []
+    error_rows = []
+
+    for p in sorted(sample_dir.glob("*.json")):
+        try:
+            obj = json.loads(p.read_text())
+        except Exception as e:
+            error_rows.append({"file": str(p), "sample_id": p.stem, "error": f"Could not read JSON: {e}"})
+            continue
+
+        if obj.get("error"):
+            error_rows.append({"file": str(p), "sample_id": obj.get("sample_id"), "error": obj.get("error")})
+            continue
+
+        path_rows.extend(obj.get("path_rows", []))
+        edge_rows.extend(obj.get("edge_rows", []))
+
+    return pd.DataFrame(path_rows), pd.DataFrame(edge_rows), pd.DataFrame(error_rows)
+
+
+def participant_average(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+
+    id_cols = ["participant_id", "mode", "path_set"]
+    meta_cols = ["cond"]
+
+    numeric_cols = [
+        c for c in df.columns
+        if c not in set(id_cols + meta_cols + ["sample_id"])
+        and pd.api.types.is_numeric_dtype(df[c])
+    ]
+
+    grouped_rows = []
+
+    for keys, sub in df.groupby(id_cols, dropna=False):
+        row = dict(zip(id_cols, keys))
+        row["cond"] = sub["cond"].astype(str).value_counts().idxmax()
+        row["n_samples_for_participant"] = int(sub["sample_id"].nunique()) if "sample_id" in sub.columns else int(len(sub))
+
+        for c in numeric_cols:
+            vals = pd.to_numeric(sub[c], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            row[c] = float(vals.mean()) if len(vals) else np.nan
+
+        grouped_rows.append(row)
+
+    return pd.DataFrame(grouped_rows)
+
+
+def condition_summary(sample_df: pd.DataFrame, participant_df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+
+    def add_rows(level_name: str, df: pd.DataFrame):
+        if df.empty:
+            return
+
+        numeric_cols = [
+            c for c in df.columns
+            if pd.api.types.is_numeric_dtype(df[c])
+            and c not in {
+                "n_source_requested",
+                "n_target_requested_per_source",
+                "long_min_hop",
+            }
+        ]
+
+        for mode in sorted(df["mode"].dropna().unique()):
+            for path_set in sorted(df["path_set"].dropna().unique()):
+                base_sub = df[(df["mode"] == mode) & (df["path_set"] == path_set)]
+
+                for cond in ["overall", "cd", "uc", "nonibd"]:
+                    sub = base_sub if cond == "overall" else base_sub[base_sub["cond"] == cond]
+                    if len(sub) == 0:
+                        continue
+
+                    row = {
+                        "level": level_name,
+                        "mode": mode,
+                        "path_set": path_set,
+                        "cond": cond,
+                        "n": int(len(sub)),
+                    }
+
+                    for c in numeric_cols:
+                        vals = pd.to_numeric(sub[c], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+                        row[f"{c}_mean"] = float(vals.mean()) if len(vals) else np.nan
+                        row[f"{c}_sd"] = float(vals.std(ddof=0)) if len(vals) else np.nan
+
+                    rows.append(row)
+
+    add_rows("sample graphwise", sample_df)
+    add_rows("participant average", participant_df)
+
+    return pd.DataFrame(rows)
+
+
+def fmt_mean_sd(row: pd.Series, col: str, digits: int = 3) -> str:
+    m = row.get(f"{col}_mean", np.nan)
+    s = row.get(f"{col}_sd", np.nan)
+
+    try:
+        m = float(m)
+        s = float(s)
+    except Exception:
+        return "--"
+
+    if not math.isfinite(m):
+        return "--"
+    if not math.isfinite(s):
+        return f"{m:.{digits}f}"
+    return f"{m:.{digits}f} $\\pm$ {s:.{digits}f}"
+
+
+def latex_quantile_table(
+    summary: pd.DataFrame,
+    metric: str,
+    path_set: str,
+    out_path: Path,
+    caption: str,
+    label: str,
+    quantiles: List[int],
+) -> None:
+    sub = summary[summary["path_set"] == path_set].copy()
+    sub = sub[sub["mode"].isin(["minimum_hop", "minimax"])].copy()
+
+    lines = []
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(caption)
+    lines.append(label)
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(r"\begin{tabular}{lll" + "r" * (1 + len(quantiles)) + r"}")
+    lines.append(r"\toprule")
+    header = "Level & Path type & Condition & $n$ & " + " & ".join([f"q{q}" for q in quantiles]) + r" \\"
+    lines.append(header)
+    lines.append(r"\midrule")
+
+    level_order = {"sample graphwise": 0, "participant average": 1}
+    mode_order = {"minimum_hop": 0, "minimax": 1}
+    cond_order = {"overall": 0, "cd": 1, "uc": 2, "nonibd": 3}
+
+    sub["_level_order"] = sub["level"].map(level_order)
+    sub["_mode_order"] = sub["mode"].map(mode_order)
+    sub["_cond_order"] = sub["cond"].map(cond_order)
+    sub = sub.sort_values(["_level_order", "_mode_order", "_cond_order"])
+
+    for _, r in sub.iterrows():
+        mode_disp = "minimum-hop" if r["mode"] == "minimum_hop" else "minimax"
+        vals = [fmt_mean_sd(r, f"{metric}_q{q}") for q in quantiles]
+        line = (
+            f"{r['level']} & {mode_disp} & {display_cond(r['cond'])} & {int(r['n'])} & "
+            + " & ".join(vals)
+            + r" \\"
+        )
+        lines.append(line)
+
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}%")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    out_path.write_text("\n".join(lines) + "\n")
+
+
+def latex_edge_concentration_table(
+    summary: pd.DataFrame,
+    path_set: str,
+    out_path: Path,
+) -> None:
+    sub = summary[summary["path_set"] == path_set].copy()
+    sub = sub[sub["mode"].isin(["minimum_hop", "minimax"])].copy()
+
+    lines = []
+    lines.append(r"\begin{table}[ht]")
+    lines.append(r"\centering")
+    lines.append(
+        r"\caption{Long-range path-edge concentration diagnostics. Edge traversal shares are computed by ranking active directed edges within each sample graph according to how often they are traversed by sampled long-range paths. Participant-average rows are obtained by first averaging sample-level concentration diagnostics within participant and then reporting mean $\pm$ SD across participants.}"
+    )
+    lines.append(r"\label{tab:long_range_path_edge_concentration}")
+    lines.append(r"\resizebox{\textwidth}{!}{%")
+    lines.append(r"\begin{tabular}{lllrrrrrrr}")
+    lines.append(r"\toprule")
+    lines.append(
+        r"Level & Path type & Condition & $n$ & Top 1\% share & Top 5\% share & Top 10\% share & Top 1\% median support & Top 5\% median support & Top 10\% median support \\"
+    )
+    lines.append(r"\midrule")
+
+    level_order = {"sample graphwise": 0, "participant average": 1}
+    mode_order = {"minimum_hop": 0, "minimax": 1}
+    cond_order = {"overall": 0, "cd": 1, "uc": 2, "nonibd": 3}
+
+    sub["_level_order"] = sub["level"].map(level_order)
+    sub["_mode_order"] = sub["mode"].map(mode_order)
+    sub["_cond_order"] = sub["cond"].map(cond_order)
+    sub = sub.sort_values(["_level_order", "_mode_order", "_cond_order"])
+
+    for _, r in sub.iterrows():
+        mode_disp = "minimum-hop" if r["mode"] == "minimum_hop" else "minimax"
+        vals = [
+            fmt_mean_sd(r, "top1pct_traversal_share"),
+            fmt_mean_sd(r, "top5pct_traversal_share"),
+            fmt_mean_sd(r, "top10pct_traversal_share"),
+            fmt_mean_sd(r, "top1pct_median_support_top_used"),
+            fmt_mean_sd(r, "top5pct_median_support_top_used"),
+            fmt_mean_sd(r, "top10pct_median_support_top_used"),
+        ]
+        line = (
+            f"{r['level']} & {mode_disp} & {display_cond(r['cond'])} & {int(r['n'])} & "
+            + " & ".join(vals)
+            + r" \\"
+        )
+        lines.append(line)
+
+    lines.append(r"\bottomrule")
+    lines.append(r"\end{tabular}%")
+    lines.append(r"}")
+    lines.append(r"\end{table}")
+    out_path.write_text("\n".join(lines) + "\n")
+
+
+def write_outputs(out_dir: Path, quantiles: List[int], long_min_hop: int) -> None:
+    sample_dir = out_dir / "sample_results"
+    path_df, edge_df, errors_df = load_all_sample_json(sample_dir)
+
+    path_sample_csv = out_dir / "path_backbone_sample_path_quantiles.csv"
+    edge_sample_csv = out_dir / "path_backbone_sample_edge_concentration.csv"
+    path_part_csv = out_dir / "path_backbone_participant_path_quantiles.csv"
+    edge_part_csv = out_dir / "path_backbone_participant_edge_concentration.csv"
+    path_summary_csv = out_dir / "path_backbone_condition_path_summary.csv"
+    edge_summary_csv = out_dir / "path_backbone_condition_edge_summary.csv"
+    errors_csv = out_dir / "path_backbone_failed_samples.csv"
+
+    path_df.to_csv(path_sample_csv, index=False)
+    edge_df.to_csv(edge_sample_csv, index=False)
+    errors_df.to_csv(errors_csv, index=False)
+
+    path_part = participant_average(path_df)
+    edge_part = participant_average(edge_df)
+
+    path_part.to_csv(path_part_csv, index=False)
+    edge_part.to_csv(edge_part_csv, index=False)
+
+    path_summary = condition_summary(path_df, path_part)
+    edge_summary = condition_summary(edge_df, edge_part)
+
+    path_summary.to_csv(path_summary_csv, index=False)
+    edge_summary.to_csv(edge_summary_csv, index=False)
+
+    long_set = f"long_hop_ge{long_min_hop}"
+
+    latex_quantile_table(
+        path_summary,
+        metric="path_length",
+        path_set=long_set,
+        out_path=out_dir / "latex_long_range_path_length_quantiles.tex",
+        caption=(
+            r"\caption{Long-range directed path-length quantiles. Long-range paths are defined as sampled source--target pairs with minimum-hop distance at least "
+            + str(long_min_hop)
+            + r". Sample-level rows are computed on individual sample graphs. Participant-average rows are obtained by averaging sample-level quantiles within participant. Values are mean $\pm$ SD.}"
+        ),
+        label=r"\label{tab:long_range_path_length_quantiles}",
+        quantiles=quantiles,
+    )
+
+    latex_quantile_table(
+        path_summary,
+        metric="bottleneck_w",
+        path_set=long_set,
+        out_path=out_dir / "latex_long_range_bottleneck_weight_quantiles.tex",
+        caption=(
+            r"\caption{Long-range directed path bottleneck-weight quantiles. The bottleneck weight of a path is $\max_{e\in p} w(e)$, the weakest-supported edge along the path. Lower values indicate that even the weakest edge on the path has stronger inferred microbial support. Values are mean $\pm$ SD.}"
+        ),
+        label=r"\label{tab:long_range_bottleneck_weight_quantiles}",
+        quantiles=quantiles,
+    )
+
+    latex_quantile_table(
+        path_summary,
+        metric="min_support",
+        path_set=long_set,
+        out_path=out_dir / "latex_long_range_minimum_support_quantiles.tex",
+        caption=(
+            r"\caption{Long-range directed path minimum-support quantiles. Minimum support is defined as $1-\max_{e\in p} w(e)$, so larger values indicate that the whole path avoids weakly supported transitions. Values are mean $\pm$ SD.}"
+        ),
+        label=r"\label{tab:long_range_minimum_support_quantiles}",
+        quantiles=quantiles,
+    )
+
+    latex_quantile_table(
+        path_summary,
+        metric="mean_w2",
+        path_set=long_set,
+        out_path=out_dir / "latex_long_range_mean_w2_quantiles.tex",
+        caption=(
+            r"\caption{Long-range directed path mean-$w^2$ quantiles. For each sampled path, mean $w^2$ is computed across the directed edges in the selected path. Values are mean $\pm$ SD.}"
+        ),
+        label=r"\label{tab:long_range_mean_w2_quantiles}",
+        quantiles=quantiles,
+    )
+
+    latex_edge_concentration_table(
+        edge_summary,
+        path_set=long_set,
+        out_path=out_dir / "latex_long_range_edge_concentration.tex",
+    )
+
+    print("\nWrote main outputs:")
+    for p in [
+        path_sample_csv,
+        edge_sample_csv,
+        path_part_csv,
+        edge_part_csv,
+        path_summary_csv,
+        edge_summary_csv,
+        errors_csv,
+        out_dir / "latex_long_range_path_length_quantiles.tex",
+        out_dir / "latex_long_range_bottleneck_weight_quantiles.tex",
+        out_dir / "latex_long_range_minimum_support_quantiles.tex",
+        out_dir / "latex_long_range_mean_w2_quantiles.tex",
+        out_dir / "latex_long_range_edge_concentration.tex",
+    ]:
+        print(" ", p)
+
+    print("\nRows:")
+    print("  sample path rows:", len(path_df))
+    print("  sample edge rows:", len(edge_df))
+    print("  participant path rows:", len(path_part))
+    print("  participant edge rows:", len(edge_part))
+    print("  failed sample rows:", len(errors_df))
+
+
+# -----------------------------
+# Main
+# -----------------------------
+
+def build_tasks(args) -> List[Dict[str, Any]]:
+    base = Path(args.base).expanduser()
+    graph_dir = Path(args.graph_dir).expanduser()
+    meta_path = Path(args.meta).expanduser()
+    out_dir = Path(args.out_dir).expanduser()
+    sample_dir = out_dir / "sample_results"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+
+    meta = pd.read_csv(meta_path, low_memory=False)
+    meta = meta[["External ID", "diagnosis", "Participant ID"]].copy()
+    meta.columns = ["sample_id", "diagnosis", "participant_id"]
+    meta["cond"] = meta["diagnosis"].apply(norm_cond)
+    meta = meta[meta["cond"].isin(["cd", "uc", "nonibd"])].copy()
+    meta = meta.drop_duplicates(subset=["sample_id"]).copy()
+
+    graph_files = {p.stem: p for p in graph_dir.glob("*.graphml")}
+    meta = meta[meta["sample_id"].isin(graph_files)].copy()
+
+    if args.max_samples is not None:
+        meta = meta.head(int(args.max_samples)).copy()
+
+    tasks = []
+
+    for _, row in meta.iterrows():
+        sid = str(row["sample_id"])
+        result_path = sample_dir / f"{safe_stem(sid)}.json"
+
+        if args.resume and result_path.exists() and result_path.stat().st_size > 0:
+            continue
+
+        tasks.append({
+            "sample_id": sid,
+            "participant_id": str(row["participant_id"]),
+            "cond": str(row["cond"]),
+            "graph_path": str(graph_files[sid]),
+            "n_source": int(args.n_source),
+            "n_target": int(args.n_target),
+            "long_min_hop": int(args.long_min_hop),
+            "active_tol": float(args.active_tol),
+            "seed": stable_seed(int(args.seed), sid),
+            "quantiles": list(args.quantiles),
+            "result_path": str(result_path),
+        })
+
+    print("Metadata samples matched to graphs:", len(meta))
+    print("Participants:", meta["participant_id"].nunique())
+    print("Condition counts:")
+    print(meta["cond"].value_counts().to_string())
+    print("Samples still to process:", len(tasks))
+
+    return tasks
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", default=str(Path.home() / "Real_Data"))
+    parser.add_argument("--graph-dir", default=str(Path.home() / "Real_Data" / "out_graphs"))
+    parser.add_argument("--meta", default=str(Path.home() / "Real_Data" / "hmp2_metadata.csv"))
+    parser.add_argument("--out-dir", default=str(Path.home() / "Real_Data" / "Path_Backbone_LongRange_Diagnostics"))
+    parser.add_argument("--n-source", type=int, default=100)
+    parser.add_argument("--n-target", type=int, default=100)
+    parser.add_argument("--long-min-hop", type=int, default=4)
+    parser.add_argument("--active-tol", type=float, default=1e-12)
+    parser.add_argument("--seed", type=int, default=20260707)
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument("--quantiles", type=int, nargs="+", default=DEFAULT_QUANTILES)
+    parser.add_argument("--write-only", action="store_true", help="Only aggregate existing sample JSON files.")
+    args = parser.parse_args()
+
+    args.resume = not args.no_resume
+
+    out_dir = Path(args.out_dir).expanduser()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sample_dir = out_dir / "sample_results"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+
+    config = {
+        "graph_dir": str(Path(args.graph_dir).expanduser()),
+        "meta": str(Path(args.meta).expanduser()),
+        "out_dir": str(out_dir),
+        "n_source": args.n_source,
+        "n_target": args.n_target,
+        "long_min_hop": args.long_min_hop,
+        "active_tol": args.active_tol,
+        "seed": args.seed,
+        "workers": args.workers,
+        "quantiles": args.quantiles,
+        "protocol": "sample graph diagnostics -> participant averaging -> condition summary",
+        "long_range_definition": f"minimum-hop distance >= {args.long_min_hop}",
+        "active_edge_definition": f"w < 1 - {args.active_tol}",
+    }
+    (out_dir / "run_config.json").write_text(json.dumps(config, indent=2))
+
+    print("=" * 100)
+    print("Long-range path-backbone diagnostics")
+    print("=" * 100)
+    print(json.dumps(config, indent=2))
+
+    if args.write_only:
+        write_outputs(out_dir, args.quantiles, args.long_min_hop)
+        return
+
+    tasks = build_tasks(args)
+
+    if tasks:
+        t0 = time.time()
+        done = 0
+        errors = 0
+
+        with ProcessPoolExecutor(max_workers=int(args.workers)) as ex:
+            futures = {ex.submit(worker, t): t for t in tasks}
+
+            for fut in as_completed(futures):
+                task = futures[fut]
+                sid = task["sample_id"]
+                result_path = Path(task["result_path"])
+
+                try:
+                    obj = fut.result()
+                except Exception:
+                    obj = {
+                        "sample_id": sid,
+                        "path_rows": [],
+                        "edge_rows": [],
+                        "error": traceback.format_exc(),
+                    }
+
+                if obj.get("error"):
+                    errors += 1
+
+                atomic_write_json(result_path, obj)
+
+                done += 1
+                if done == 1 or done % 10 == 0 or done == len(tasks):
+                    elapsed = time.time() - t0
+                    rate = done / elapsed if elapsed > 0 else float("nan")
+                    remaining = len(tasks) - done
+                    eta = remaining / rate if rate > 0 else float("nan")
+                    print(
+                        f"[progress] {done}/{len(tasks)} processed | errors={errors} | "
+                        f"rate={rate:.3f} samples/s | ETA={eta/3600:.2f} h | latest={sid}",
+                        flush=True,
+                    )
+
+    print("\nAggregating outputs...")
+    write_outputs(out_dir, args.quantiles, args.long_min_hop)
+
+    failed = out_dir / "path_backbone_failed_samples.csv"
+    if failed.exists():
+        try:
+            fdf = pd.read_csv(failed)
+            if len(fdf):
+                print("\n[WARNING] Some samples failed. See:")
+                print(" ", failed)
+            else:
+                print("\n[READY] No failed samples recorded.")
+        except Exception:
+            pass
+
+    print("\n[READY] Path-backbone diagnostics finished.")
+
+
+if __name__ == "__main__":
+    main()
+PY
