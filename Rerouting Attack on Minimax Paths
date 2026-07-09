@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""
+Plot sequential routing-attack replacement-path diagnostics.
+
+This script reads the condition-level summary CSV produced by the sequential
+routing-attack diagnostic and creates three publication-ready plots:
+
+1. Reachable fraction vs cumulative edge removals.
+2. Penalised bottleneck weight vs cumulative edge removals.
+3. Penalised path length vs cumulative edge removals.
+
+Expected input
+--------------
+A CSV containing one row per level / condition / removal step, with columns:
+
+    level
+    cond
+    step
+    reachable_fraction_mean
+    reachable_fraction_sd
+    penalized_bottleneck_w_mean_mean
+    penalized_bottleneck_w_mean_sd
+    penalized_path_length_mean_mean
+    penalized_path_length_mean_sd
+
+These column names match the output of sequential_routing_attack.py.
+
+Protocol represented by the plots
+---------------------------------
+The intended upstream diagnostic is:
+
+    sample graph diagnostics
+        -> average within participant
+        -> report mean ± SD across participants by condition
+
+By default, this script plots only the participant-average rows.
+"""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+
+CONDITION_ORDER = ["overall", "cd", "uc", "nonibd"]
+
+CONDITION_LABELS = {
+    "overall": "overall",
+    "cd": "CD",
+    "uc": "UC",
+    "nonibd": "non-IBD",
+}
+
+
+PLOT_SPECS = [
+    {
+        "metric": "reachable_fraction",
+        "output_name": "reachable_fraction_vs_removals",
+        "title": "Replacement-path survival under routing-attack removals",
+        "y_label": "Reachable fraction",
+        "y_min": 0.0,
+        "y_max": 1.03,
+    },
+    {
+        "metric": "penalized_bottleneck_w_mean",
+        "output_name": "penalized_bottleneck_weight_vs_removals",
+        "title": "Penalised bottleneck weight under routing-attack removals",
+        "y_label": "Penalised bottleneck weight",
+        "y_min": 0.0,
+        "y_max": 1.03,
+    },
+    {
+        "metric": "penalized_path_length_mean",
+        "output_name": "penalized_path_length_vs_removals",
+        "title": "Penalised path length under routing-attack removals",
+        "y_label": "Penalised path length",
+        "y_min": 0.0,
+        "y_max": None,
+    },
+]
+
+
+def normalise_condition(value: object) -> str:
+    """Normalise condition labels used by the project."""
+    s = str(value).strip().lower()
+
+    if s in {"overall", "all"}:
+        return "overall"
+    if s in {"cd", "crohn", "crohns", "crohn's disease"}:
+        return "cd"
+    if s in {"uc", "ulcerative colitis"}:
+        return "uc"
+    if s in {"nonibd", "non-ibd", "non_ibd", "control", "controls"}:
+        return "nonibd"
+
+    return s
+
+
+def require_columns(df: pd.DataFrame, columns: list[str]) -> None:
+    missing = [col for col in columns if col not in df.columns]
+    if missing:
+        raise ValueError(
+            "Input summary CSV is missing required columns:\n"
+            + "\n".join(f"  - {col}" for col in missing)
+        )
+
+
+def prepare_dataframe(summary_csv: Path, level: str, include_overall: bool) -> pd.DataFrame:
+    df = pd.read_csv(summary_csv)
+
+    require_columns(
+        df,
+        [
+            "level",
+            "cond",
+            "step",
+            "reachable_fraction_mean",
+            "reachable_fraction_sd",
+            "penalized_bottleneck_w_mean_mean",
+            "penalized_bottleneck_w_mean_sd",
+            "penalized_path_length_mean_mean",
+            "penalized_path_length_mean_sd",
+        ],
+    )
+
+    df = df.copy()
+    df["cond"] = df["cond"].apply(normalise_condition)
+
+    df = df[df["level"] == level].copy()
+
+    if not include_overall:
+        df = df[df["cond"] != "overall"].copy()
+
+    if df.empty:
+        raise ValueError(
+            f"No rows found for level={level!r}. "
+            "Check the --level argument and the input CSV."
+        )
+
+    df["step"] = pd.to_numeric(df["step"], errors="coerce")
+    df = df.dropna(subset=["step"]).copy()
+    df["step"] = df["step"].astype(int)
+
+    return df
+
+
+def metric_columns(metric: str) -> tuple[str, str]:
+    """Return mean and SD column names for a metric prefix."""
+    return f"{metric}_mean", f"{metric}_sd"
+
+
+def plot_metric(
+    df: pd.DataFrame,
+    metric: str,
+    output_path_base: Path,
+    title: str,
+    y_label: str,
+    y_min: float | None,
+    y_max: float | None,
+    dpi: int,
+    formats: list[str],
+    show_sd: bool,
+) -> None:
+    mean_col, sd_col = metric_columns(metric)
+    require_columns(df, [mean_col, sd_col])
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+
+    for cond in CONDITION_ORDER:
+        sub = df[df["cond"] == cond].sort_values("step")
+
+        if sub.empty:
+            continue
+
+        x = sub["step"].to_numpy(dtype=float)
+        y = pd.to_numeric(sub[mean_col], errors="coerce").to_numpy(dtype=float)
+        sd = pd.to_numeric(sub[sd_col], errors="coerce").to_numpy(dtype=float)
+
+        finite = np.isfinite(x) & np.isfinite(y)
+        x = x[finite]
+        y = y[finite]
+        sd = sd[finite]
+
+        if len(x) == 0:
+            continue
+
+        line, = ax.plot(
+            x,
+            y,
+            marker="o",
+            linewidth=2.0,
+            label=CONDITION_LABELS.get(cond, cond),
+        )
+
+        if show_sd and len(sd) == len(y):
+            sd = np.where(np.isfinite(sd), sd, 0.0)
+            lower = y - sd
+            upper = y + sd
+            ax.fill_between(
+                x,
+                lower,
+                upper,
+                alpha=0.15,
+                color=line.get_color(),
+                linewidth=0,
+            )
+
+    ax.set_title(title)
+    ax.set_xlabel("Number of cumulative edge removals")
+    ax.set_ylabel(y_label)
+
+    steps = sorted(df["step"].dropna().unique())
+    ax.set_xticks(steps)
+
+    if y_min is not None or y_max is not None:
+        ax.set_ylim(y_min, y_max)
+    elif metric == "penalized_path_length_mean":
+        ymax = pd.to_numeric(df[mean_col], errors="coerce").max()
+        if np.isfinite(ymax):
+            ax.set_ylim(0.0, ymax * 1.12)
+
+    ax.grid(True, alpha=0.25)
+    ax.legend(frameon=False)
+    fig.tight_layout()
+
+    output_path_base.parent.mkdir(parents=True, exist_ok=True)
+
+    for ext in formats:
+        ext = ext.lower().lstrip(".")
+        out = output_path_base.with_suffix(f".{ext}")
+
+        if ext in {"png", "jpg", "jpeg", "tif", "tiff"}:
+            fig.savefig(out, dpi=dpi)
+        else:
+            fig.savefig(out)
+
+    plt.close(fig)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Plot sequential routing-attack diagnostic curves."
+    )
+
+    parser.add_argument(
+        "--summary-csv",
+        required=True,
+        help="Path to condition_sequential_attack_summary.csv.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        help="Directory where plots should be written.",
+    )
+    parser.add_argument(
+        "--level",
+        default="participant average",
+        help="Which summary level to plot. Default: 'participant average'.",
+    )
+    parser.add_argument(
+        "--exclude-overall",
+        action="store_true",
+        help="Exclude the overall curve and plot only CD, UC, and non-IBD.",
+    )
+    parser.add_argument(
+        "--no-sd",
+        action="store_true",
+        help="Do not draw shaded ±SD regions.",
+    )
+    parser.add_argument(
+        "--formats",
+        nargs="+",
+        default=["png", "pdf"],
+        help="Output formats. Default: png pdf.",
+    )
+    parser.add_argument(
+        "--dpi",
+        type=int,
+        default=300,
+        help="DPI for raster outputs such as PNG. Default: 300.",
+    )
+
+    args = parser.parse_args()
+
+    summary_csv = Path(args.summary_csv).expanduser()
+    output_dir = Path(args.output_dir).expanduser()
+
+    df = prepare_dataframe(
+        summary_csv=summary_csv,
+        level=args.level,
+        include_overall=not args.exclude_overall,
+    )
+
+    for spec in PLOT_SPECS:
+        plot_metric(
+            df=df,
+            metric=spec["metric"],
+            output_path_base=output_dir / spec["output_name"],
+            title=spec["title"],
+            y_label=spec["y_label"],
+            y_min=spec["y_min"],
+            y_max=spec["y_max"],
+            dpi=args.dpi,
+            formats=args.formats,
+            show_sd=not args.no_sd,
+        )
+
+    print("Wrote plots to:", output_dir)
+    for spec in PLOT_SPECS:
+        for ext in args.formats:
+            print(" ", output_dir / f"{spec['output_name']}.{ext.lstrip('.')}")
+
+
+if __name__ == "__main__":
+    main()
