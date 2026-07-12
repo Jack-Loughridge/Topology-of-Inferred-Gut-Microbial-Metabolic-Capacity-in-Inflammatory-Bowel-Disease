@@ -1,72 +1,93 @@
 #!/usr/bin/env python3
 """
-Nested participant-grouped Ricci classifier for active metabolic digraphs.
+Original-style Ricci classifiers on corrected [B | K0] feature vectors.
 
-Feature representation
-----------------------
-For each sample s and each edge e in the maximal active edge universe:
+This script applies the classifier method used in the original Ricci run to all
+five manuscript tasks:
 
-    B_s(e)  = 1 if e is active/present in sample s, else 0
-    K0_s(e) = kappa_s(e) if e is active/present in sample s, else 0
+    1. non-IBD vs UC vs CD
+    2. IBD vs non-IBD
+    3. non-IBD vs UC
+    4. non-IBD vs CD
+    5. CD vs UC
 
-The classifier uses the sparse concatenated feature vector:
+Original-style classifier
+-------------------------
+For each task, the feature vector is:
 
     X_s = [B_s | K0_s]
 
-This is the Ricci representation described in the manuscript.
+where:
 
-Validation protocol
--------------------
-For each classification task:
+    B_s(e)  = 1 if edge e is active/present in sample s, else 0
+    K0_s(e) = Ricci curvature kappa_s(e) if e is active/present, else 0
 
-    outer participant-grouped split:
-        held-out test participants are never used for model selection
+The model is:
 
-    inner participant-grouped validation split inside each outer train set:
-        C and class_weight are selected by validation balanced accuracy
-        macro F1 and ROC-AUC are tie-breakers
+    StandardScaler(with_mean=True, with_std=True)
+        +
+    L1 LogisticRegression(solver="saga", class_weight="balanced", C=0.02)
 
-    refit:
-        after hyperparameter selection, refit on all outer-training samples
+The scaler is inside the sklearn Pipeline, so in cross-validation the scaler is
+fit only on the training participants of each fold and then applied to the held-
+out participants. This avoids leakage while matching the original classifier
+method.
 
-    test:
-        evaluate once on the outer-test samples
-
-Interpretation tables
----------------------
-After nested CV, the script chooses the most frequently selected hyperparameter
-setting for each task, refits one model on all samples in that task, and writes
-coefficient / process / top-edge tables for interpretation.
-
-This final refit is for interpretation only. Test performance is always the
-nested outer-fold performance.
+Coefficient interpretation
+--------------------------
+Because features are standardised, coefficients are coefficients on z-scored
+features. A positive K0 coefficient means that higher-than-training-average
+curvature for that edge pushes toward the relevant class.
 
 Inputs
 ------
-Ricci CSV files can use columns such as:
+The feature directory must contain:
 
-    a, b, k_ab
+    feature_matrix_B_K0.npz
+    matched_metadata.csv
+    edge_metadata.csv
 
-or
+These are produced by the faithful Ricci feature builder.
 
-    source, target, kappa
+Outputs
+-------
+For each task folder:
 
-One file per sample is supported. File names like CSM5XXXX_ricci.csv.gz are
-used to infer sample_id when no sample_id column exists.
+    fold_results.csv
+    aggregated_confusion_matrix.csv
+    cross_validated_predictions.csv
+    classification_report.txt
+    latex_fold_results.tex
+    latex_confusion_matrix.tex
 
-Optional process annotation
----------------------------
-If the Ricci CSVs do not contain a process/category column, pass an optional
-edge annotation CSV with columns such as:
+    single_grouped_train_val_test_split.csv
+    single_grouped_train_val_test_results.csv
+    single_split_train_report.txt
+    single_split_val_report.txt
+    single_split_test_report.txt
+    final_trainval_test_report.txt
 
-    a,b,process
+    selected_coefficients_final_trainval_model.csv
+    process_coefficient_table.csv
+    process_realised_push_table.csv
+    top_absolute_features.csv
+    top_positive_features.csv / top_negative_features.csv for binary tasks
+    top_positive_B_features.csv / top_positive_K0_features.csv for binary tasks
+    top_negative_B_features.csv / top_negative_K0_features.csv for binary tasks
 
-or
+At the top output directory:
 
-    edge,process
+    all_task_summary.csv
+    pairwise_binary_summary.csv
+    latex_all_task_summary.tex
+    latex_pairwise_binary_summary.tex
+    latex_all_original_style_ricci_tables.tex
 
-Otherwise process-level tables are still written but all edges are labelled
-"Unannotated".
+Notes
+-----
+If edge_metadata.csv contains only "Unannotated" process labels, the process
+tables will be structurally correct but biologically uninformative. In that case
+provide --edge-annotation-csv with edge/process annotations.
 """
 
 from __future__ import annotations
@@ -74,134 +95,102 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import shutil
-import sys
-import time
 import warnings
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.sparse import coo_matrix, hstack, load_npz, save_npz
+from scipy.sparse import load_npz
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     balanced_accuracy_score,
+    classification_report,
     confusion_matrix,
     f1_score,
+    log_loss,
     roc_auc_score,
 )
-from sklearn.model_selection import StratifiedGroupKFold
-
-
-SOURCE_CANDIDATES = [
-    "source", "src", "u", "a", "from", "tail", "substrate", "input", "from_node"
-]
-TARGET_CANDIDATES = [
-    "target", "dst", "v", "b", "to", "head", "product", "output", "to_node"
-]
-EDGE_CANDIDATES = [
-    "edge", "edge_id", "edge_key", "reaction_edge", "directed_edge"
-]
-KAPPA_CANDIDATES = [
-    "kappa", "curvature", "ricci", "ricci_curvature", "k0", "K0", "k_ab", "ollivier_ricci"
-]
-SAMPLE_CANDIDATES = [
-    "sample_id", "sample", "External ID", "external_id", "id"
-]
-PROCESS_CANDIDATES = [
-    "process", "process_class", "process_category", "biological_process",
-    "category", "edge_process", "reaction_process"
-]
+from sklearn.model_selection import GroupShuffleSplit, StratifiedGroupKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 TASKS = {
     "three_way": {
         "display": "non-IBD vs UC vs CD",
         "folder": "three_way_nonIBD_UC_CD",
-        "kind": "multiclass",
-        "class_names": ["non-IBD", "UC", "CD"],
+        "label_order": ["non-IBD", "UC", "CD"],
         "label_map": {"nonibd": 0, "uc": 1, "cd": 2},
         "positive_name": None,
     },
     "ibd_vs_nonibd": {
         "display": "IBD vs non-IBD",
         "folder": "IBD_vs_nonIBD",
-        "kind": "binary",
-        "class_names": ["non-IBD", "IBD"],
+        "label_order": ["non-IBD", "IBD"],
         "label_map": {"nonibd": 0, "uc": 1, "cd": 1},
         "positive_name": "IBD",
     },
     "nonibd_vs_uc": {
         "display": "non-IBD vs UC",
         "folder": "nonIBD_vs_UC",
-        "kind": "binary",
-        "class_names": ["non-IBD", "UC"],
+        "label_order": ["non-IBD", "UC"],
         "label_map": {"nonibd": 0, "uc": 1},
         "positive_name": "UC",
     },
     "nonibd_vs_cd": {
         "display": "non-IBD vs CD",
         "folder": "nonIBD_vs_CD",
-        "kind": "binary",
-        "class_names": ["non-IBD", "CD"],
+        "label_order": ["non-IBD", "CD"],
         "label_map": {"nonibd": 0, "cd": 1},
         "positive_name": "CD",
     },
     "cd_vs_uc": {
         "display": "CD vs UC",
         "folder": "CD_vs_UC",
-        "kind": "binary",
-        "class_names": ["CD", "UC"],
+        "label_order": ["CD", "UC"],
         "label_map": {"cd": 0, "uc": 1},
         "positive_name": "UC",
     },
 }
 
 
-PCT_SPECS = [
-    (0.1, "p0p1", "0.1"),
-    (1, "p1", "1"),
-    (5, "p5", "5"),
-    (10, "p10", "10"),
-    (20, "p20", "20"),
-    (30, "p30", "30"),
-    (40, "p40", "40"),
-    (50, "p50", "50"),
-    (60, "p60", "60"),
-    (70, "p70", "70"),
-    (80, "p80", "80"),
-    (90, "p90", "90"),
-    (95, "p95", "95"),
-    (99, "p99", "99"),
+PROCESS_CANDIDATES = [
+    "process",
+    "process_class",
+    "process_category",
+    "biological_process",
+    "category",
+    "edge_process",
+    "reaction_process",
 ]
 
+EDGE_CANDIDATES = [
+    "edge",
+    "edge_id",
+    "edge_key",
+    "reaction_edge",
+    "directed_edge",
+]
 
-COND_ORDER = ["overall", "cd", "uc", "nonibd"]
-COND_LABEL = {
-    "overall": "overall",
-    "cd": "CD",
-    "uc": "UC",
-    "nonibd": "non-IBD",
-}
+SOURCE_CANDIDATES = ["source", "src", "u", "a", "from", "tail"]
+TARGET_CANDIDATES = ["target", "dst", "v", "b", "to", "head"]
 
 
-def norm_cond(x: Any) -> str:
-    s = str(x).strip().lower()
-    if "crohn" in s or s == "cd":
-        return "cd"
-    if "ulcerative" in s or s == "uc":
-        return "uc"
-    if "non" in s:
-        return "nonibd"
-    return s
+def fmt(x: Any, digits: int = 3) -> str:
+    try:
+        x = float(x)
+    except Exception:
+        return "--"
+    if not math.isfinite(x):
+        return "--"
+    return f"{x:.{digits}f}"
+
+
+def fmt_mean_sd(mean: Any, sd: Any, digits: int = 3) -> str:
+    return f"{fmt(mean, digits)} $\\pm$ {fmt(sd, digits)}"
 
 
 def latex_escape(x: Any) -> str:
@@ -223,30 +212,7 @@ def latex_escape(x: Any) -> str:
     return s
 
 
-def fmt(x: Any, digits: int = 3) -> str:
-    try:
-        x = float(x)
-    except Exception:
-        return "--"
-    if not math.isfinite(x):
-        return "--"
-    return f"{x:.{digits}f}"
-
-
-def fmt_mean_sd(mean: Any, sd: Any, digits: int = 3) -> str:
-    try:
-        mean = float(mean)
-        sd = float(sd)
-    except Exception:
-        return "--"
-    if not math.isfinite(mean):
-        return "--"
-    if not math.isfinite(sd):
-        return fmt(mean, digits)
-    return f"{fmt(mean, digits)} $\\pm$ {fmt(sd, digits)}"
-
-
-def pick_col(columns, candidates, required=True, label="column"):
+def pick_col(columns, candidates, required: bool, label: str):
     cols = list(columns)
     lower = {str(c).lower(): c for c in cols}
     for cand in candidates:
@@ -259,678 +225,185 @@ def pick_col(columns, candidates, required=True, label="column"):
     return None
 
 
-def infer_sample_id_from_filename(path: Path) -> str:
-    name = path.name
-    for suffix in [".csv.gz", ".tsv.gz", ".csv", ".tsv", ".gz"]:
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
-            break
+def decode_edge_for_display(edge: str) -> str:
+    """
+    Best-effort display conversion for AGORA-style encoded metabolite names.
 
-    suffixes = [
-        "_ricci_active",
-        "_active_ricci",
-        "_ricci",
-        ".ricci_active",
-        ".active_ricci",
-        ".ricci",
-    ]
-    for suffix in suffixes:
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
-            break
+    Example:
+        M_FOL__91__C__93__ -> FOL[C]
 
-    return name
+    This does not try to map abbreviations to biochemical full names. It only
+    makes the edge string more readable.
+    """
+    s = str(edge)
+    s = s.replace("__91__", "[")
+    s = s.replace("__93__", "]")
+    s = s.replace("M_", "")
+    s = s.replace("_DASH_", "-")
+    return s
 
 
-def read_csv_chunks(path: Path, chunksize: int):
-    sep = "\t" if path.name.endswith(".tsv") or path.name.endswith(".tsv.gz") else ","
-    return pd.read_csv(path, sep=sep, low_memory=False, chunksize=chunksize)
+def load_edge_annotation(path: Path | None) -> dict[str, dict[str, str]]:
+    """
+    Optional annotation file.
 
+    Supported formats:
+      edge,process
+      edge,process,edge_display
+      a,b,process
+      source,target,process
 
-def detect_columns(chunk: pd.DataFrame) -> dict[str, str | None]:
-    edge_col = pick_col(chunk.columns, EDGE_CANDIDATES, required=False, label="edge column")
-
-    source_col = None
-    target_col = None
-    if edge_col is None:
-        source_col = pick_col(chunk.columns, SOURCE_CANDIDATES, required=True, label="source column")
-        target_col = pick_col(chunk.columns, TARGET_CANDIDATES, required=True, label="target column")
-
-    kappa_col = pick_col(chunk.columns, KAPPA_CANDIDATES, required=True, label="curvature column")
-    sample_col = pick_col(chunk.columns, SAMPLE_CANDIDATES, required=False, label="sample id column")
-    process_col = pick_col(chunk.columns, PROCESS_CANDIDATES, required=False, label="process column")
-
-    return {
-        "edge_col": edge_col,
-        "source_col": source_col,
-        "target_col": target_col,
-        "kappa_col": kappa_col,
-        "sample_col": sample_col,
-        "process_col": process_col,
-    }
-
-
-def build_edge_series(chunk: pd.DataFrame, detected: dict[str, str | None]) -> pd.Series:
-    if detected["edge_col"] is not None:
-        return chunk[detected["edge_col"]].astype(str)
-    return chunk[detected["source_col"]].astype(str) + " -> " + chunk[detected["target_col"]].astype(str)
-
-
-def find_ricci_files(ricci_dir: Path, explicit_glob: str | None) -> list[Path]:
-    if explicit_glob:
-        files = sorted(ricci_dir.glob(explicit_glob))
-    else:
-        files = sorted(ricci_dir.rglob("*ricci*.csv*"))
-        files = [p for p in files if "diagnostic" not in p.name.lower()]
-        if not files:
-            files = sorted(ricci_dir.rglob("*.csv.gz")) + sorted(ricci_dir.rglob("*.csv"))
-
-    files = [p for p in files if p.is_file()]
-    if not files:
-        raise FileNotFoundError(f"No Ricci CSV files found in {ricci_dir}")
-    return files
-
-
-def load_metadata(metadata_path: Path) -> pd.DataFrame:
-    meta = pd.read_csv(metadata_path, low_memory=False)
-
-    sample_col = pick_col(
-        meta.columns,
-        ["External ID", "sample_id", "sample", "external_id"],
-        label="sample id in metadata",
-    )
-    participant_col = pick_col(
-        meta.columns,
-        ["Participant ID", "participant_id", "participant", "host_subject_id"],
-        label="participant id in metadata",
-    )
-    diagnosis_col = pick_col(
-        meta.columns,
-        ["diagnosis", "Diagnosis", "condition", "cond"],
-        label="diagnosis in metadata",
-    )
-
-    out = meta[[sample_col, participant_col, diagnosis_col]].copy()
-    out.columns = ["sample_id", "participant_id", "diagnosis"]
-    out["sample_id"] = out["sample_id"].astype(str)
-    out["participant_id"] = out["participant_id"].astype(str)
-    out["cond"] = out["diagnosis"].apply(norm_cond)
-    out = out[out["cond"].isin(["cd", "uc", "nonibd"])]
-    out = out.drop_duplicates("sample_id").reset_index(drop=True)
-    return out
-
-
-def balanced_limit_metadata(metadata: pd.DataFrame, max_samples: int | None, seed: int) -> pd.DataFrame:
-    if max_samples is None or max_samples >= len(metadata):
-        return metadata.copy()
-
-    rng = np.random.default_rng(seed)
-    conds = [c for c in ["cd", "uc", "nonibd"] if c in set(metadata["cond"])]
-    base = max_samples // len(conds)
-    rem = max_samples % len(conds)
-
-    parts = []
-    for i, cond in enumerate(conds):
-        sub = metadata[metadata["cond"] == cond].copy()
-        n_take = min(len(sub), base + (1 if i < rem else 0))
-        if n_take:
-            idx = rng.choice(sub.index.to_numpy(), size=n_take, replace=False)
-            parts.append(sub.loc[idx])
-
-    limited = pd.concat(parts, axis=0) if parts else metadata.head(max_samples).copy()
-
-    if len(limited) < max_samples:
-        remaining = metadata.drop(index=limited.index, errors="ignore")
-        n_extra = min(max_samples - len(limited), len(remaining))
-        if n_extra:
-            idx = rng.choice(remaining.index.to_numpy(), size=n_extra, replace=False)
-            limited = pd.concat([limited, remaining.loc[idx]], axis=0)
-
-    limited = limited.sample(frac=1.0, random_state=seed).reset_index(drop=True)
-
-    print(f"[max_samples] Balanced subset: {len(limited)} samples", flush=True)
-    print(limited["cond"].value_counts().to_string(), flush=True)
-    print("participants:", limited["participant_id"].nunique(), flush=True)
-
-    return limited
-
-
-def load_edge_annotation(path: Path | None) -> dict[str, str]:
+    Returned mapping:
+      key -> {"process": ..., "edge_display": ...}
+    """
     if path is None:
         return {}
 
-    ann = pd.read_csv(path, low_memory=False)
-    process_col = pick_col(ann.columns, PROCESS_CANDIDATES, required=True, label="process column in annotation file")
-    edge_col = pick_col(ann.columns, EDGE_CANDIDATES, required=False, label="edge column in annotation file")
+    df = pd.read_csv(path, low_memory=False)
+    process_col = pick_col(df.columns, PROCESS_CANDIDATES, required=True, label="process column")
+    edge_col = pick_col(df.columns, EDGE_CANDIDATES, required=False, label="edge column")
+    display_col = pick_col(
+        df.columns,
+        ["edge_display", "display_edge", "edge_name", "reaction_name", "label"],
+        required=False,
+        label="display edge column",
+    )
 
     if edge_col is None:
-        source_col = pick_col(ann.columns, SOURCE_CANDIDATES, required=True, label="source column in annotation file")
-        target_col = pick_col(ann.columns, TARGET_CANDIDATES, required=True, label="target column in annotation file")
-        edge = ann[source_col].astype(str) + " -> " + ann[target_col].astype(str)
+        source_col = pick_col(df.columns, SOURCE_CANDIDATES, required=True, label="source column")
+        target_col = pick_col(df.columns, TARGET_CANDIDATES, required=True, label="target column")
+        edge_series = df[source_col].astype(str) + " -> " + df[target_col].astype(str)
     else:
-        edge = ann[edge_col].astype(str)
-
-    proc = ann[process_col].fillna("Unannotated").astype(str)
+        edge_series = df[edge_col].astype(str)
 
     mapping = {}
-    for e, p in zip(edge, proc):
-        if e not in mapping or mapping[e] == "Unannotated":
-            mapping[e] = p if p else "Unannotated"
+    for i, edge in enumerate(edge_series):
+        proc = str(df.iloc[i][process_col]) if pd.notna(df.iloc[i][process_col]) else "Unannotated"
+        disp = str(df.iloc[i][display_col]) if display_col and pd.notna(df.iloc[i][display_col]) else edge
+        mapping[edge] = {"process": proc, "edge_display": disp}
+        mapping[decode_edge_for_display(edge)] = {"process": proc, "edge_display": disp}
 
-    print(f"[annotation] Loaded process labels for {len(mapping):,} edges from {path}", flush=True)
+    print(f"[annotation] Loaded {len(mapping):,} annotation keys from {path}", flush=True)
     return mapping
 
 
-def pass1_discover_edges(
-    files: list[Path],
-    chunksize: int,
-) -> tuple[dict[str, int], dict[str, str], set[str], dict[str, Any]]:
-    edge_to_idx: dict[str, int] = {}
-    edge_process: dict[str, str] = {}
-    sample_ids: set[str] = set()
-    detected_by_file: dict[str, Any] = {}
-
-    print("[pass1] Discovering samples and edge universe...", flush=True)
-    t0 = time.time()
-
-    for fi, path in enumerate(files, start=1):
-        file_sample = infer_sample_id_from_filename(path)
-        first = True
-        detected = None
-        n_rows = 0
-
-        for chunk in read_csv_chunks(path, chunksize):
-            if first:
-                detected = detect_columns(chunk)
-                detected_by_file[str(path)] = detected
-                first = False
-
-            edges = build_edge_series(chunk, detected)
-            kappa = pd.to_numeric(chunk[detected["kappa_col"]], errors="coerce")
-            ok = kappa.notna() & np.isfinite(kappa.to_numpy(dtype=float))
-
-            if detected["sample_col"] is not None:
-                sample_ids.update(chunk.loc[ok, detected["sample_col"]].astype(str).unique().tolist())
-            else:
-                sample_ids.add(file_sample)
-
-            if detected["process_col"] is not None:
-                procs = chunk.loc[ok, detected["process_col"]].fillna("Unannotated").astype(str)
-            else:
-                procs = pd.Series(["Unannotated"] * int(ok.sum()))
-
-            for e, proc in zip(edges.loc[ok].astype(str), procs):
-                if e not in edge_to_idx:
-                    edge_to_idx[e] = len(edge_to_idx)
-                    edge_process[e] = proc if proc else "Unannotated"
-                elif edge_process[e] == "Unannotated" and proc:
-                    edge_process[e] = proc
-
-            n_rows += len(chunk)
-
-        print(
-            f"  [{fi}/{len(files)}] {path.name}: rows={n_rows:,}, "
-            f"edges={len(edge_to_idx):,}, samples={len(sample_ids):,}",
-            flush=True,
-        )
-
-    print(
-        f"[pass1 done] edges={len(edge_to_idx):,}, samples={len(sample_ids):,}, "
-        f"time={(time.time() - t0) / 60:.1f} min",
-        flush=True,
-    )
-
-    return edge_to_idx, edge_process, sample_ids, detected_by_file
-
-
-def build_sparse_features(
-    files: list[Path],
-    metadata: pd.DataFrame,
-    edge_to_idx: dict[str, int],
-    chunksize: int,
-    out_dir: Path,
-) -> Any:
-    n_edges = len(edge_to_idx)
-    samples = metadata["sample_id"].tolist()
-    sample_to_row = {s: i for i, s in enumerate(samples)}
-
-    rows_b, cols_b, data_b = [], [], []
-    rows_k, cols_k, data_k = [], [], []
-
-    print("[pass2] Building sparse [B | K0] feature matrix...", flush=True)
-    t0 = time.time()
-
-    for fi, path in enumerate(files, start=1):
-        file_sample = infer_sample_id_from_filename(path)
-        first = True
-        detected = None
-        used_rows = 0
-
-        for chunk in read_csv_chunks(path, chunksize):
-            if first:
-                detected = detect_columns(chunk)
-                first = False
-
-            edges = build_edge_series(chunk, detected)
-            kappa = pd.to_numeric(chunk[detected["kappa_col"]], errors="coerce")
-            ok = kappa.notna() & np.isfinite(kappa.to_numpy(dtype=float))
-
-            if detected["sample_col"] is not None:
-                sid = chunk[detected["sample_col"]].astype(str)
-            else:
-                sid = pd.Series([file_sample] * len(chunk), index=chunk.index)
-
-            small = pd.DataFrame(
-                {
-                    "sample_id": sid.loc[ok].astype(str),
-                    "edge": edges.loc[ok].astype(str),
-                    "kappa": kappa.loc[ok].astype(float),
-                }
-            )
-
-            small = small[small["sample_id"].isin(sample_to_row)]
-            if small.empty:
-                continue
-
-            small = small.groupby(["sample_id", "edge"], as_index=False)["kappa"].mean()
-
-            for sample_id, edge, kap in small.itertuples(index=False):
-                ei = edge_to_idx.get(edge)
-                if ei is None:
-                    continue
-                ri = sample_to_row[sample_id]
-
-                rows_b.append(ri)
-                cols_b.append(ei)
-                data_b.append(1.0)
-
-                rows_k.append(ri)
-                cols_k.append(ei)
-                data_k.append(float(kap))
-
-            used_rows += len(small)
-
-        print(f"  [{fi}/{len(files)}] {path.name}: used sample-edge rows={used_rows:,}", flush=True)
-
-    n_samples = len(samples)
-
-    B = coo_matrix((data_b, (rows_b, cols_b)), shape=(n_samples, n_edges), dtype=np.float32).tocsr()
-    B.data[:] = 1.0
-
-    K = coo_matrix((data_k, (rows_k, cols_k)), shape=(n_samples, n_edges), dtype=np.float32).tocsr()
-    X = hstack([B, K], format="csr")
-
-    save_npz(out_dir / "feature_matrix_B_K0.npz", X)
-
-    print(
-        f"[pass2 done] X shape={X.shape}, nnz={X.nnz:,}, "
-        f"time={(time.time() - t0) / 60:.1f} min",
-        flush=True,
-    )
-
-    return X
-
-
-def build_or_load_features(args, metadata_all: pd.DataFrame):
-    out_dir = Path(args.output_dir).expanduser()
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    feature_dir = Path(args.feature_dir).expanduser() if args.feature_dir else out_dir
-
-    matrix_path = feature_dir / "feature_matrix_B_K0.npz"
+def load_inputs(feature_dir: Path, annotation_csv: Path | None):
+    X_path = feature_dir / "feature_matrix_B_K0.npz"
     meta_path = feature_dir / "matched_metadata.csv"
     edge_path = feature_dir / "edge_metadata.csv"
 
-    if args.feature_dir or args.reuse_features:
-        if matrix_path.exists() and meta_path.exists() and edge_path.exists():
-            print(f"[reuse] Loading features from {feature_dir}", flush=True)
-            X = load_npz(matrix_path).tocsr()
-            matched = pd.read_csv(meta_path)
-            edge_meta = pd.read_csv(edge_path)
+    if not X_path.exists():
+        raise FileNotFoundError(f"Missing feature matrix: {X_path}")
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Missing matched metadata: {meta_path}")
+    if not edge_path.exists():
+        raise FileNotFoundError(f"Missing edge metadata: {edge_path}")
 
-            matched["sample_id"] = matched["sample_id"].astype(str)
-            matched["participant_id"] = matched["participant_id"].astype(str)
-            matched["cond"] = matched["cond"].astype(str)
+    X_sparse = load_npz(X_path).tocsr()
+    meta = pd.read_csv(meta_path)
+    edge_meta = pd.read_csv(edge_path)
 
-            if feature_dir != out_dir:
-                shutil.copy2(matrix_path, out_dir / "feature_matrix_B_K0.npz")
-                shutil.copy2(meta_path, out_dir / "matched_metadata.csv")
-                shutil.copy2(edge_path, out_dir / "edge_metadata.csv")
+    for c in ["sample_id", "participant_id", "cond"]:
+        if c not in meta.columns:
+            raise ValueError(f"matched_metadata.csv missing required column: {c}")
 
-            print("Feature matrix:", X.shape, "nnz=", X.nnz, flush=True)
-            print("Participants:", matched["participant_id"].nunique(), flush=True)
-            print(matched.drop_duplicates("participant_id")["cond"].value_counts().to_string(), flush=True)
-            return X, matched, edge_meta
+    if "edge" not in edge_meta.columns:
+        raise ValueError("edge_metadata.csv must contain an 'edge' column.")
 
-        if args.feature_dir:
-            raise FileNotFoundError(
-                f"--feature-dir was provided, but required files were not found in {feature_dir}"
-            )
+    if "process" not in edge_meta.columns:
+        edge_meta["process"] = "Unannotated"
 
-    files = find_ricci_files(Path(args.ricci_dir).expanduser(), args.ricci_glob)
-    print("Ricci files found:", len(files), flush=True)
-    for p in files[:10]:
-        print(" ", p, flush=True)
-    if len(files) > 10:
-        print(" ...", flush=True)
+    meta["sample_id"] = meta["sample_id"].astype(str)
+    meta["participant_id"] = meta["participant_id"].astype(str)
+    meta["cond"] = meta["cond"].astype(str)
 
-    edge_to_idx, edge_process, sample_ids, detected = pass1_discover_edges(files, args.chunksize)
+    edge_meta["edge"] = edge_meta["edge"].astype(str)
+    edge_meta["process"] = edge_meta["process"].fillna("Unannotated").astype(str)
 
-    ann = load_edge_annotation(Path(args.edge_annotation_csv).expanduser() if args.edge_annotation_csv else None)
+    if X_sparse.shape[0] != len(meta):
+        raise ValueError(
+            f"Feature rows ({X_sparse.shape[0]}) do not match metadata rows ({len(meta)})."
+        )
 
-    inv_edges = [None] * len(edge_to_idx)
-    for e, idx in edge_to_idx.items():
-        inv_edges[idx] = e
-
-    process_labels = []
-    for e in inv_edges:
-        process_labels.append(ann.get(e, edge_process.get(e, "Unannotated")))
-
-    matched = metadata_all[metadata_all["sample_id"].isin(sample_ids)].copy()
-    if args.max_samples is not None:
-        matched = balanced_limit_metadata(matched, args.max_samples, args.seed)
-
-    if matched.empty:
-        raise ValueError("No metadata sample IDs matched Ricci files.")
-
-    matched = matched.reset_index(drop=True)
-
-    print("Matched samples:", matched["sample_id"].nunique(), flush=True)
-    print("Matched participants:", matched["participant_id"].nunique(), flush=True)
-    print(matched.drop_duplicates("participant_id")["cond"].value_counts().to_string(), flush=True)
-
-    X = build_sparse_features(files, matched, edge_to_idx, args.chunksize, out_dir)
-
-    edge_meta = pd.DataFrame(
-        {
-            "edge_index": np.arange(len(inv_edges)),
-            "edge": inv_edges,
-            "process": process_labels,
-        }
-    )
-
-    matched.to_csv(out_dir / "matched_metadata.csv", index=False)
-    edge_meta.to_csv(out_dir / "edge_metadata.csv", index=False)
-    (out_dir / "detected_columns_by_file.json").write_text(json.dumps(detected, indent=2, default=str))
-
-    return X, matched, edge_meta
-
-
-def active_kappa_values(B, K, row_i: int) -> np.ndarray:
-    b0, b1 = B.indptr[row_i], B.indptr[row_i + 1]
-    active_edges = B.indices[b0:b1]
-
-    if active_edges.size == 0:
-        return np.asarray([], dtype=float)
-
-    k0, k1 = K.indptr[row_i], K.indptr[row_i + 1]
-    k_idx = K.indices[k0:k1]
-    k_data = K.data[k0:k1]
-
-    vals = np.zeros(active_edges.size, dtype=float)
-
-    if k_idx.size:
-        order = np.argsort(active_edges)
-        active_sorted = active_edges[order]
-
-        pos = np.searchsorted(active_sorted, k_idx)
-        ok = (pos >= 0) & (pos < active_sorted.size)
-        ok[ok] &= active_sorted[pos[ok]] == k_idx[ok]
-
-        vals_sorted = np.zeros(active_sorted.size, dtype=float)
-        vals_sorted[pos[ok]] = k_data[ok]
-
-        inv = np.empty_like(order)
-        inv[order] = np.arange(order.size)
-        vals = vals_sorted[inv]
-
-    vals = vals[np.isfinite(vals)]
-    return vals
-
-
-def write_percentile_latex(summary: pd.DataFrame, out_path: Path):
-    lines = [
-        r"\begin{table}[ht]",
-        r"\centering",
-        r"\caption{Participant-average percentile bands of Ricci curvature values. Percentiles are first computed within each sample graph across active directed edges, then averaged within participant; condition values are mean $\pm$ SD across participants.}",
-        r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{lr" + "r" * len(PCT_SPECS) + "}",
-        r"\toprule",
-        "Condition & $n$ & " + " & ".join([rf"$p_{{{lab}}}$" for _, _, lab in PCT_SPECS]) + r" \\",
-        r"\midrule",
-    ]
-
-    for cond in COND_ORDER:
-        sub = summary[summary["cond"] == cond]
-        if sub.empty:
-            continue
-        row = sub.iloc[0]
-        vals = [
-            fmt_mean_sd(row.get(f"{col}_mean", np.nan), row.get(f"{col}_sd", np.nan))
-            for _, col, _ in PCT_SPECS
-        ]
-        lines.append(f"{COND_LABEL[cond]} & {int(row['n'])} & " + " & ".join(vals) + r" \\")
-
-    lines += [r"\bottomrule", r"\end{tabular}%", r"}", r"\end{table}"]
-    out_path.write_text("\n".join(lines) + "\n")
-
-
-def ricci_percentiles_and_density(X, matched: pd.DataFrame, edge_meta: pd.DataFrame, out_dir: Path, skip_density: bool):
     n_edges = len(edge_meta)
-    B = X[:, :n_edges].tocsr()
-    K = X[:, n_edges:].tocsr()
+    if X_sparse.shape[1] != 2 * n_edges:
+        raise ValueError(
+            f"Feature columns ({X_sparse.shape[1]}) do not equal 2 * n_edges ({2*n_edges})."
+        )
 
-    pct_values = [x[0] for x in PCT_SPECS]
-    sample_rows = []
+    ann = load_edge_annotation(annotation_csv)
 
-    print("[diagnostics] Computing Ricci percentile diagnostics...", flush=True)
+    edge_display = []
+    process = []
 
-    for i, m in matched.reset_index(drop=True).iterrows():
-        vals = active_kappa_values(B, K, i)
+    for edge, proc0 in zip(edge_meta["edge"], edge_meta["process"]):
+        decoded = decode_edge_for_display(edge)
+        item = ann.get(edge) or ann.get(decoded)
 
-        row = {
-            "sample_id": m["sample_id"],
-            "participant_id": m["participant_id"],
-            "cond": m["cond"],
-            "n_active_ricci_edges": int(vals.size),
-        }
-
-        if vals.size:
-            qs = np.percentile(vals, pct_values)
-            for (_, col, _), q in zip(PCT_SPECS, qs):
-                row[col] = float(q)
+        if item:
+            edge_display.append(item["edge_display"])
+            process.append(item["process"])
         else:
-            for _, col, _ in PCT_SPECS:
-                row[col] = np.nan
+            edge_display.append(decoded)
+            process.append(proc0 if proc0 else "Unannotated")
 
-        sample_rows.append(row)
+    edge_meta["edge_display"] = edge_display
+    edge_meta["process"] = process
 
-    sample_df = pd.DataFrame(sample_rows)
-    sample_df.to_csv(out_dir / "ricci_curvature_percentiles_samplewise.csv", index=False)
-
-    numeric_cols = ["n_active_ricci_edges"] + [col for _, col, _ in PCT_SPECS]
-
-    participant_rows = []
-    for pid, sub in sample_df.groupby("participant_id", dropna=False):
-        prow = {
-            "participant_id": pid,
-            "cond": sub["cond"].astype(str).value_counts().idxmax(),
-            "n_samples_for_participant": int(sub["sample_id"].nunique()),
+    feature_meta = pd.DataFrame(
+        {
+            "feature_index": np.arange(2 * n_edges),
+            "feature": (
+                [f"B__{e}" for e in edge_meta["edge"].tolist()]
+                + [f"K__{e}" for e in edge_meta["edge"].tolist()]
+            ),
+            "feature_type": ["B"] * n_edges + ["K0"] * n_edges,
+            "edge_index": list(range(n_edges)) + list(range(n_edges)),
+            "edge": edge_meta["edge"].tolist() + edge_meta["edge"].tolist(),
+            "edge_display": edge_meta["edge_display"].tolist() + edge_meta["edge_display"].tolist(),
+            "process": edge_meta["process"].tolist() + edge_meta["process"].tolist(),
         }
-        for col in numeric_cols:
-            vals = pd.to_numeric(sub[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-            prow[col] = float(vals.mean()) if len(vals) else np.nan
-        participant_rows.append(prow)
-
-    participant_df = pd.DataFrame(participant_rows)
-    participant_df.to_csv(out_dir / "ricci_curvature_percentiles_participant_average.csv", index=False)
-
-    summary_rows = []
-    for cond in COND_ORDER:
-        sub = participant_df if cond == "overall" else participant_df[participant_df["cond"] == cond]
-        srow = {"cond": cond, "n": int(len(sub))}
-        for col in numeric_cols:
-            vals = pd.to_numeric(sub[col], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-            srow[f"{col}_mean"] = float(vals.mean()) if len(vals) else np.nan
-            srow[f"{col}_sd"] = float(vals.std(ddof=0)) if len(vals) else np.nan
-        summary_rows.append(srow)
-
-    summary = pd.DataFrame(summary_rows)
-    summary.to_csv(out_dir / "ricci_curvature_percentiles_participant_condition_summary.csv", index=False)
-    write_percentile_latex(summary, out_dir / "latex_ricci_curvature_percentiles_participant_average.tex")
-
-    print("[diagnostics] Participant counts in Ricci percentile table:", flush=True)
-    print(summary[["cond", "n"]].to_string(index=False), flush=True)
-
-    if not skip_density:
-        make_density_plots(B, K, matched, out_dir)
-
-
-def make_density_plots(B, K, matched: pd.DataFrame, out_dir: Path, n_bins: int = 260):
-    plot_dir = out_dir / "plots"
-    plot_dir.mkdir(parents=True, exist_ok=True)
-
-    print("[density] Preparing Ricci density curves...", flush=True)
-
-    all_vals = []
-    for i in range(B.shape[0]):
-        vals = active_kappa_values(B, K, i)
-        if vals.size:
-            all_vals.append(vals)
-
-    if not all_vals:
-        print("[density] No finite Ricci values found; skipping plots.", flush=True)
-        return
-
-    all_vals = np.concatenate(all_vals)
-    all_vals = all_vals[np.isfinite(all_vals)]
-
-    x_min = float(np.percentile(all_vals, 0.2))
-    x_max = float(np.percentile(all_vals, 99.8))
-    x_min = max(-40.0, min(x_min, -5.0))
-    x_max = min(1.0, max(x_max, 0.5))
-
-    if x_min >= x_max:
-        x_min, x_max = -30.0, 1.0
-
-    bins = np.linspace(x_min, x_max, n_bins + 1)
-    centers = 0.5 * (bins[:-1] + bins[1:])
-
-    sample_rows = []
-    meta = matched.reset_index(drop=True)
-
-    for i, m in meta.iterrows():
-        vals = active_kappa_values(B, K, i)
-        vals = vals[(vals >= x_min) & (vals <= x_max)]
-        if vals.size:
-            dens, _ = np.histogram(vals, bins=bins, density=True)
-        else:
-            dens = np.zeros(len(centers), dtype=float)
-
-        for center, d in zip(centers, dens):
-            sample_rows.append(
-                {
-                    "sample_id": m["sample_id"],
-                    "participant_id": m["participant_id"],
-                    "cond": m["cond"],
-                    "kappa_bin_center": float(center),
-                    "density": float(d),
-                }
-            )
-
-    sample_density = pd.DataFrame(sample_rows)
-    sample_density.to_csv(out_dir / "ricci_curvature_density_samplewise.csv", index=False)
-
-    participant_density = (
-        sample_density
-        .groupby(["participant_id", "cond", "kappa_bin_center"], as_index=False)["density"]
-        .mean()
     )
-    participant_density.to_csv(out_dir / "ricci_curvature_density_participant_average.csv", index=False)
 
-    summary_rows = []
-    for cond in COND_ORDER:
-        sub = participant_density if cond == "overall" else participant_density[participant_density["cond"] == cond]
-        for center, g in sub.groupby("kappa_bin_center"):
-            vals = pd.to_numeric(g["density"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-            summary_rows.append(
-                {
-                    "cond": cond,
-                    "kappa_bin_center": float(center),
-                    "n_participants": int(g["participant_id"].nunique()),
-                    "density_mean": float(vals.mean()) if len(vals) else np.nan,
-                    "density_sd": float(vals.std(ddof=0)) if len(vals) else np.nan,
-                }
-            )
-
-    summary = pd.DataFrame(summary_rows)
-    summary.to_csv(out_dir / "ricci_curvature_density_condition_summary.csv", index=False)
-
-    def draw(log_density: bool):
-        fig, ax = plt.subplots(figsize=(7.2, 4.8))
-
-        for cond in COND_ORDER:
-            sub = summary[summary["cond"] == cond].sort_values("kappa_bin_center")
-            if sub.empty:
-                continue
-
-            x = sub["kappa_bin_center"].to_numpy(dtype=float)
-            y = sub["density_mean"].to_numpy(dtype=float)
-            sd = sub["density_sd"].to_numpy(dtype=float)
-            sd = np.where(np.isfinite(sd), sd, 0.0)
-
-            if log_density:
-                eps = 1e-8
-                y_plot = np.log10(y + eps)
-                lo = np.log10(np.maximum(y - sd, 0.0) + eps)
-                hi = np.log10(y + sd + eps)
-                ylabel = r"$\log_{10}$ density"
-                title = "Participant-average Ricci curvature log-density"
-                out_base = plot_dir / "ricci_curvature_log_density_by_condition"
-            else:
-                y_plot = y
-                lo = np.maximum(y - sd, 0.0)
-                hi = y + sd
-                ylabel = "Density"
-                title = "Participant-average Ricci curvature density"
-                out_base = plot_dir / "ricci_curvature_density_by_condition"
-
-            line, = ax.plot(x, y_plot, linewidth=2.0, label=COND_LABEL[cond])
-            ax.fill_between(x, lo, hi, alpha=0.15, color=line.get_color(), linewidth=0)
-
-        ax.set_xlabel(r"Ricci curvature $\kappa$")
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-        ax.grid(True, alpha=0.25)
-        ax.legend(frameon=False)
-        fig.tight_layout()
-
-        fig.savefig(str(out_base) + ".png", dpi=300)
-        fig.savefig(str(out_base) + ".pdf")
-        plt.close(fig)
-
-    draw(log_density=False)
-    draw(log_density=True)
-
-    print("[density] Wrote:", flush=True)
-    print(" ", plot_dir / "ricci_curvature_density_by_condition.png", flush=True)
-    print(" ", plot_dir / "ricci_curvature_log_density_by_condition.png", flush=True)
+    return X_sparse, meta, edge_meta, feature_meta
 
 
-def class_weight_value(name: str):
-    return None if name == "none" else name
+def make_task_data(X_dense: np.ndarray, meta: pd.DataFrame, task_key: str):
+    spec = TASKS[task_key]
+    rows = []
+    y = []
+
+    for i, cond in enumerate(meta["cond"].tolist()):
+        if cond in spec["label_map"]:
+            rows.append(i)
+            y.append(spec["label_map"][cond])
+
+    rows = np.asarray(rows, dtype=int)
+    y = np.asarray(y, dtype=int)
+    meta_task = meta.iloc[rows].reset_index(drop=True)
+
+    return X_dense[rows], y, meta_task
 
 
-def make_model(C: float, class_weight_name: str, max_iter: int, tol: float, seed: int, n_jobs: int):
-    return LogisticRegression(
-        penalty="l1",
-        solver="saga",
-        C=float(C),
-        class_weight=class_weight_value(class_weight_name),
-        max_iter=int(max_iter),
-        tol=float(tol),
-        random_state=int(seed),
-        n_jobs=int(n_jobs),
+def make_model(C: float, max_iter: int, tol: float, seed: int, n_jobs: int, verbose: int):
+    return Pipeline(
+        [
+            ("scaler", StandardScaler(with_mean=True, with_std=True)),
+            (
+                "clf",
+                LogisticRegression(
+                    penalty="l1",
+                    solver="saga",
+                    class_weight="balanced",
+                    C=float(C),
+                    max_iter=int(max_iter),
+                    tol=float(tol),
+                    random_state=int(seed),
+                    n_jobs=int(n_jobs),
+                    verbose=int(verbose),
+                ),
+            ),
+        ]
     )
 
 
@@ -953,190 +426,168 @@ def safe_auc(y_true: np.ndarray, proba: np.ndarray, n_classes: int) -> float:
         return np.nan
 
 
-def score_predictions(y_true: np.ndarray, pred: np.ndarray, proba: np.ndarray, n_classes: int) -> dict[str, float]:
-    return {
+def score_model(y_true: np.ndarray, pred: np.ndarray, proba: np.ndarray, n_classes: int):
+    out = {
         "accuracy": float(accuracy_score(y_true, pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, pred)),
         "macro_f1": float(f1_score(y_true, pred, average="macro", zero_division=0)),
         "roc_auc": safe_auc(y_true, proba, n_classes),
     }
 
+    if n_classes == 2:
+        out["positive_f1"] = float(f1_score(y_true, pred, pos_label=1, zero_division=0))
+    else:
+        out["positive_f1"] = np.nan
 
-def safe_group_splits(y: np.ndarray, groups: np.ndarray, requested: int, display: str) -> int:
-    counts = []
-    for cls in sorted(np.unique(y)):
-        counts.append(len(set(groups[y == cls])))
+    return out
 
-    if len(counts) < 2:
-        raise ValueError(f"{display}: only one class is present after filtering.")
 
-    n_splits = min(int(requested), min(counts))
-    if n_splits < 2:
-        raise ValueError(
-            f"{display}: not enough participant groups per class for grouped CV. "
-            f"Groups per class: {counts}"
-        )
+def safe_log_loss(y_true: np.ndarray, proba: np.ndarray, n_classes: int) -> float:
+    try:
+        return float(log_loss(y_true, proba, labels=np.arange(n_classes)))
+    except Exception:
+        return np.nan
 
-    if n_splits < requested:
+
+def write_text_report(path: Path, text: str):
+    path.write_text(text + "\n")
+
+
+def run_grouped_cv(X_task, y, meta_task, task_key: str, args, task_dir: Path):
+    spec = TASKS[task_key]
+    label_order = spec["label_order"]
+    n_classes = len(label_order)
+    groups = meta_task["participant_id"].to_numpy()
+
+    cv = StratifiedGroupKFold(
+        n_splits=args.n_splits,
+        shuffle=True,
+        random_state=args.seed,
+    )
+
+    fold_rows = []
+    pred_rows = []
+    all_true = []
+    all_pred = []
+
+    print(f"\nUsing CV splitter for {spec['display']}: StratifiedGroupKFold", flush=True)
+
+    for fold, (tr, te) in enumerate(cv.split(X_task, y, groups=groups), start=1):
+        trg = set(groups[tr])
+        teg = set(groups[te])
+        overlap = len(trg & teg)
+
         print(
-            f"[CV] Reducing n_splits from {requested} to {n_splits} for {display}; "
-            f"groups per class={counts}",
+            f"fold {fold}: train_participants={len(trg)}, "
+            f"test_participants={len(teg)}, overlap={overlap}",
             flush=True,
         )
 
-    return n_splits
-
-
-def parse_float_grid(s: str) -> list[float]:
-    vals = []
-    for part in s.split(","):
-        part = part.strip()
-        if part:
-            vals.append(float(part))
-    if not vals:
-        raise ValueError("Empty C grid.")
-    return vals
-
-
-def parse_class_weight_grid(s: str) -> list[str]:
-    vals = []
-    for part in s.split(","):
-        part = part.strip().lower()
-        if part in {"none", "balanced"}:
-            vals.append(part)
-        elif part:
-            raise ValueError(f"Unknown class_weight value: {part}")
-    if not vals:
-        raise ValueError("Empty class_weight grid.")
-    return vals
-
-
-def task_subset(X, matched: pd.DataFrame, task_key: str):
-    spec = TASKS[task_key]
-    rows, y = [], []
-    for i, cond in enumerate(matched["cond"].tolist()):
-        if cond in spec["label_map"]:
-            rows.append(i)
-            y.append(spec["label_map"][cond])
-
-    rows = np.asarray(rows, dtype=int)
-    y = np.asarray(y, dtype=int)
-    meta = matched.iloc[rows].reset_index(drop=True)
-    return X[rows], y, meta
-
-
-def hyperparameter_grid(args):
-    Cs = parse_float_grid(args.C_grid)
-    cws = parse_class_weight_grid(args.class_weight_grid)
-    return [{"C": C, "class_weight": cw} for C in Cs for cw in cws]
-
-
-def select_hyperparameters(
-    X_train,
-    y_train: np.ndarray,
-    groups_train: np.ndarray,
-    n_classes: int,
-    task_display: str,
-    args,
-) -> tuple[dict[str, Any], pd.DataFrame]:
-    grid = hyperparameter_grid(args)
-
-    inner_splits = safe_group_splits(y_train, groups_train, args.inner_splits, task_display + " inner")
-    sgkf = StratifiedGroupKFold(n_splits=inner_splits, shuffle=True, random_state=args.seed + 1000)
-
-    split_iter = list(sgkf.split(X_train, y_train, groups_train))
-    if args.inner_mode == "single":
-        split_iter = split_iter[:1]
-
-    rows = []
-
-    for params in grid:
-        fold_scores = []
-
-        for inner_fold, (itr, iva) in enumerate(split_iter, start=1):
-            if len(np.unique(y_train[itr])) < 2 or len(np.unique(y_train[iva])) < 2:
-                continue
-
-            model = make_model(
-                C=params["C"],
-                class_weight_name=params["class_weight"],
-                max_iter=args.max_iter,
-                tol=args.tol,
-                seed=args.seed + inner_fold,
-                n_jobs=args.n_jobs,
-            )
-
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always", ConvergenceWarning)
-                model.fit(X_train[itr], y_train[itr])
-                conv = any(isinstance(w.message, ConvergenceWarning) for w in caught)
-
-            pred = model.predict(X_train[iva])
-            proba = model.predict_proba(X_train[iva])
-            score = score_predictions(y_train[iva], pred, proba, n_classes)
-
-            fold_scores.append(score)
-
-            rows.append(
-                {
-                    "C": params["C"],
-                    "class_weight": params["class_weight"],
-                    "inner_fold": inner_fold,
-                    "validation_samples": int(len(iva)),
-                    "validation_participants": int(len(set(groups_train[iva]))),
-                    "accuracy": score["accuracy"],
-                    "balanced_accuracy": score["balanced_accuracy"],
-                    "macro_f1": score["macro_f1"],
-                    "roc_auc": score["roc_auc"],
-                    "convergence_warning": bool(conv),
-                }
-            )
-
-    if not rows:
-        raise RuntimeError(f"No valid inner-validation fits completed for {task_display}.")
-
-    val_df = pd.DataFrame(rows)
-
-    agg = (
-        val_df
-        .groupby(["C", "class_weight"], as_index=False)
-        .agg(
-            val_accuracy=("accuracy", "mean"),
-            val_balanced_accuracy=("balanced_accuracy", "mean"),
-            val_macro_f1=("macro_f1", "mean"),
-            val_roc_auc=("roc_auc", "mean"),
-            convergence_warnings=("convergence_warning", "sum"),
+        model = make_model(
+            C=args.C,
+            max_iter=args.max_iter,
+            tol=args.tol,
+            seed=args.seed,
+            n_jobs=args.n_jobs,
+            verbose=args.sklearn_verbose,
         )
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", ConvergenceWarning)
+            model.fit(X_task[tr], y[tr])
+            conv = any(isinstance(w.message, ConvergenceWarning) for w in caught)
+
+        pred = model.predict(X_task[te])
+        proba = model.predict_proba(X_task[te])
+        metrics = score_model(y[te], pred, proba, n_classes)
+
+        fold_rows.append(
+            {
+                "fold": fold,
+                "train_samples": int(len(tr)),
+                "test_samples": int(len(te)),
+                "train_participants": int(len(trg)),
+                "test_participants": int(len(teg)),
+                "participant_overlap": int(overlap),
+                "accuracy": metrics["accuracy"],
+                "balanced_accuracy": metrics["balanced_accuracy"],
+                "macro_f1": metrics["macro_f1"],
+                "positive_f1": metrics["positive_f1"],
+                "roc_auc": metrics["roc_auc"],
+                "convergence_warning": bool(conv),
+            }
+        )
+
+        for local_idx, yy, pp, prob in zip(te, y[te], pred, proba):
+            row = {
+                "fold": fold,
+                "sample_id": meta_task.iloc[local_idx]["sample_id"],
+                "participant_id": meta_task.iloc[local_idx]["participant_id"],
+                "true_label": label_order[int(yy)],
+                "pred_label": label_order[int(pp)],
+            }
+            for ci, cname in enumerate(label_order):
+                row[f"proba_{cname}"] = float(prob[ci])
+            pred_rows.append(row)
+
+        all_true.extend(y[te].tolist())
+        all_pred.extend(pred.tolist())
+
+        print(
+            f"  {spec['display']} fold {fold}: "
+            f"acc={metrics['accuracy']:.3f}, "
+            f"bacc={metrics['balanced_accuracy']:.3f}, "
+            f"macro_f1={metrics['macro_f1']:.3f}, "
+            f"auc={metrics['roc_auc']:.3f}, "
+            f"convergence_warning={conv}",
+            flush=True,
+        )
+
+    fold_df = pd.DataFrame(fold_rows)
+    pred_df = pd.DataFrame(pred_rows)
+    cm = confusion_matrix(all_true, all_pred, labels=list(range(n_classes)))
+    cm_df = pd.DataFrame(cm, index=label_order, columns=label_order)
+
+    report = classification_report(
+        all_true,
+        all_pred,
+        labels=list(range(n_classes)),
+        target_names=label_order,
+        zero_division=0,
     )
 
-    agg["cw_rank"] = agg["class_weight"].map({"balanced": 0, "none": 1}).fillna(2)
-    agg = agg.sort_values(
-        ["val_balanced_accuracy", "val_macro_f1", "val_roc_auc", "C", "cw_rank"],
-        ascending=[False, False, False, True, True],
-        na_position="last",
-    ).reset_index(drop=True)
+    fold_df.to_csv(task_dir / "fold_results.csv", index=False)
+    pred_df.to_csv(task_dir / "cross_validated_predictions.csv", index=False)
+    cm_df.to_csv(task_dir / "aggregated_confusion_matrix.csv")
+    write_text_report(task_dir / "classification_report.txt", report)
 
-    best = agg.iloc[0].to_dict()
-    selected = {
-        "C": float(best["C"]),
-        "class_weight": str(best["class_weight"]),
-        "val_balanced_accuracy": float(best["val_balanced_accuracy"]),
-        "val_macro_f1": float(best["val_macro_f1"]),
-        "val_roc_auc": float(best["val_roc_auc"]) if pd.notna(best["val_roc_auc"]) else np.nan,
-    }
+    write_fold_latex(fold_df, spec, task_dir / "latex_fold_results.tex", args.C)
+    write_confusion_latex(cm, label_order, spec["display"], task_dir / "latex_confusion_matrix.tex")
 
-    return selected, val_df
+    print("\nTest-set confusion matrix, CV grouped by TRUE participant:")
+    print(cm_df.to_string())
+    print("\nTest-set classification report, CV grouped by TRUE participant:")
+    print(report)
+
+    print(f"\n=== 5-fold CV, original-style L1 logistic on standardised [B|K0], {spec['display']} ===")
+    print(f"C                 : {args.C}")
+    print(f"accuracy          : {fold_df['accuracy'].mean():.3f} ± {fold_df['accuracy'].std(ddof=0):.3f}")
+    print(f"balanced accuracy : {fold_df['balanced_accuracy'].mean():.3f} ± {fold_df['balanced_accuracy'].std(ddof=0):.3f}")
+    print(f"macro F1          : {fold_df['macro_f1'].mean():.3f} ± {fold_df['macro_f1'].std(ddof=0):.3f}")
+    print(f"ROC-AUC           : {fold_df['roc_auc'].mean():.3f} ± {fold_df['roc_auc'].std(ddof=0):.3f}")
+
+    return fold_df, pred_df, cm
 
 
-def write_fold_latex(fold_df: pd.DataFrame, spec: dict[str, Any], out_path: Path):
+def write_fold_latex(fold_df: pd.DataFrame, spec: dict[str, Any], out_path: Path, C: float):
     lines = [
         r"\begin{table}[ht]",
         r"\centering",
-        rf"\caption{{Nested participant-grouped five-fold performance for {latex_escape(spec['display'])}. Hyperparameters are selected using an inner participant-grouped validation split inside each outer training fold.}}",
+        rf"\caption{{Participant-grouped five-fold performance for the original-style Ricci classifier on {latex_escape(spec['display'])}. The model uses fold-internal standardisation of $[B\mid K_0]$ features and L1 logistic regression with $C={C}$.}}",
         r"\resizebox{\textwidth}{!}{%",
-        r"\begin{tabular}{rrrrrrrrrrr}",
+        r"\begin{tabular}{rrrrrrrr}",
         r"\toprule",
-        r"Fold & Train & Test & Train participants & Test participants & $C$ & Class weight & Accuracy & Balanced acc. & Macro F1 & ROC-AUC \\",
+        r"Fold & Train & Test & Train participants & Test participants & Accuracy & Balanced acc. & Macro F1 / ROC-AUC \\",
         r"\midrule",
     ]
 
@@ -1144,23 +595,20 @@ def write_fold_latex(fold_df: pd.DataFrame, spec: dict[str, Any], out_path: Path
         lines.append(
             f"{int(r['fold'])} & {int(r['train_samples'])} & {int(r['test_samples'])} & "
             f"{int(r['train_participants'])} & {int(r['test_participants'])} & "
-            f"{fmt(r['selected_C'])} & {latex_escape(r['selected_class_weight'])} & "
             f"{fmt(r['accuracy'])} & {fmt(r['balanced_accuracy'])} & "
-            f"{fmt(r['macro_f1'])} & {fmt(r['roc_auc'])} \\\\"
+            f"{fmt(r['macro_f1'])} / {fmt(r['roc_auc'])} \\\\"
         )
-
-    metrics = ["accuracy", "balanced_accuracy", "macro_f1", "roc_auc"]
-    mean = fold_df[metrics].mean(numeric_only=True)
-    sd = fold_df[metrics].std(ddof=0, numeric_only=True)
 
     lines += [
         r"\midrule",
-        "Mean & -- & -- & -- & -- & -- & -- & "
-        + " & ".join(fmt(mean[m]) for m in metrics)
-        + r" \\",
-        "SD & -- & -- & -- & -- & -- & -- & "
-        + " & ".join(fmt(sd[m]) for m in metrics)
-        + r" \\",
+        "Mean & -- & -- & -- & -- & "
+        + f"{fmt(fold_df['accuracy'].mean())} & "
+        + f"{fmt(fold_df['balanced_accuracy'].mean())} & "
+        + f"{fmt(fold_df['macro_f1'].mean())} / {fmt(fold_df['roc_auc'].mean())} \\\\",
+        "SD & -- & -- & -- & -- & "
+        + f"{fmt(fold_df['accuracy'].std(ddof=0))} & "
+        + f"{fmt(fold_df['balanced_accuracy'].std(ddof=0))} & "
+        + f"{fmt(fold_df['macro_f1'].std(ddof=0))} / {fmt(fold_df['roc_auc'].std(ddof=0))} \\\\",
         r"\bottomrule",
         r"\end{tabular}%",
         r"}",
@@ -1170,26 +618,446 @@ def write_fold_latex(fold_df: pd.DataFrame, spec: dict[str, Any], out_path: Path
     out_path.write_text("\n".join(lines) + "\n")
 
 
-def write_confusion_latex(cm: np.ndarray, class_names: list[str], task_display: str, out_path: Path):
-    align = "l" + "r" * len(class_names)
+def write_confusion_latex(cm: np.ndarray, label_order: list[str], task_display: str, out_path: Path):
+    align = "l" + "r" * len(label_order)
     lines = [
         r"\begin{table}[ht]",
         r"\centering",
-        rf"\caption{{Aggregated outer-test confusion matrix for {latex_escape(task_display)}. Rows denote true labels and columns denote predicted labels.}}",
+        rf"\caption{{Aggregated confusion matrix for the original-style Ricci classifier on {latex_escape(task_display)}. Rows denote true labels and columns denote predicted labels.}}",
         rf"\begin{{tabular}}{{{align}}}",
         r"\toprule",
-        " & " + " & ".join(f"Predicted {latex_escape(c)}" for c in class_names) + r" \\",
+        " & " + " & ".join(f"Predicted {latex_escape(c)}" for c in label_order) + r" \\",
         r"\midrule",
     ]
 
-    for i, cname in enumerate(class_names):
+    for i, cname in enumerate(label_order):
         lines.append(f"True {latex_escape(cname)} & " + " & ".join(str(int(v)) for v in cm[i]) + r" \\")
 
     lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     out_path.write_text("\n".join(lines) + "\n")
 
 
-def write_df_latex(df: pd.DataFrame, out_path: Path, caption: str):
+def summarise_split(name: str, y: np.ndarray, groups: np.ndarray, label_order: list[str]):
+    print(f"\n{name} summary:")
+    print(f"  samples      : {len(y)}")
+    print(f"  participants : {len(np.unique(groups))}")
+    for class_idx, class_name in enumerate(label_order):
+        c = int(np.sum(y == class_idx))
+        print(f"  {class_name:8s}: {c}")
+
+
+def evaluate_split(name: str, model: Pipeline, X: np.ndarray, y: np.ndarray, label_order: list[str], out_path: Path):
+    n_classes = len(label_order)
+
+    pred = model.predict(X)
+    proba = model.predict_proba(X)
+    metrics = score_model(y, pred, proba, n_classes)
+    ll = safe_log_loss(y, proba, n_classes)
+
+    cm = confusion_matrix(y, pred, labels=list(range(n_classes)))
+    report = classification_report(
+        y,
+        pred,
+        labels=list(range(n_classes)),
+        target_names=label_order,
+        zero_division=0,
+    )
+
+    lines = []
+    lines.append(f"=== {name.upper()} RESULTS ===")
+    lines.append(str(cm))
+    lines.append("")
+    lines.append(report)
+    lines.append(f"{name} log loss: {ll:.4f}" if np.isfinite(ll) else f"{name} log loss: NA")
+
+    if n_classes == 2:
+        lines.append(f"{name} ROC-AUC: {metrics['roc_auc']:.4f}" if np.isfinite(metrics["roc_auc"]) else f"{name} ROC-AUC: NA")
+    else:
+        lines.append(f"{name} ROC-AUC macro OVR: {metrics['roc_auc']:.4f}" if np.isfinite(metrics["roc_auc"]) else f"{name} ROC-AUC macro OVR: NA")
+
+    text = "\n".join(lines)
+    print("\n" + text)
+    out_path.write_text(text + "\n")
+
+    return {
+        "split": name,
+        "samples": int(len(y)),
+        "participants": None,
+        "accuracy": metrics["accuracy"],
+        "balanced_accuracy": metrics["balanced_accuracy"],
+        "macro_f1": metrics["macro_f1"],
+        "positive_f1": metrics["positive_f1"],
+        "roc_auc": metrics["roc_auc"],
+        "log_loss": ll,
+    }
+
+
+def original_grouped_train_val_test_and_interpret(
+    X_task,
+    y,
+    meta_task,
+    feature_meta: pd.DataFrame,
+    task_key: str,
+    args,
+    task_dir: Path,
+):
+    """
+    Reproduce the original run's single participant-grouped train/val/test split
+    and final train+val coefficient model.
+
+    This is not the primary performance estimate. The primary estimate is the
+    participant-grouped 5-fold CV above.
+    """
+    spec = TASKS[task_key]
+    label_order = spec["label_order"]
+    n_classes = len(label_order)
+    groups = meta_task["participant_id"].to_numpy()
+
+    gss1 = GroupShuffleSplit(n_splits=1, train_size=args.train_frac, random_state=args.seed)
+    train_idx, temp_idx = next(gss1.split(X_task, y, groups=groups))
+
+    X_train, y_train, g_train = X_task[train_idx], y[train_idx], groups[train_idx]
+    X_temp, y_temp, g_temp = X_task[temp_idx], y[temp_idx], groups[temp_idx]
+
+    second_train_size = args.val_frac / (args.val_frac + args.test_frac)
+    gss2 = GroupShuffleSplit(n_splits=1, train_size=second_train_size, random_state=args.seed)
+    val_rel_idx, test_rel_idx = next(gss2.split(X_temp, y_temp, groups=g_temp))
+
+    val_idx = temp_idx[val_rel_idx]
+    test_idx = temp_idx[test_rel_idx]
+
+    X_val, y_val, g_val = X_task[val_idx], y[val_idx], groups[val_idx]
+    X_test, y_test, g_test = X_task[test_idx], y[test_idx], groups[test_idx]
+
+    train_parts = set(g_train)
+    val_parts = set(g_val)
+    test_parts = set(g_test)
+
+    print("\nParticipant overlap checks:")
+    print(f"  train ∩ val  = {len(train_parts & val_parts)}")
+    print(f"  train ∩ test = {len(train_parts & test_parts)}")
+    print(f"  val   ∩ test = {len(val_parts & test_parts)}")
+
+    summarise_split("Train", y_train, g_train, label_order)
+    summarise_split("Val", y_val, g_val, label_order)
+    summarise_split("Test", y_test, g_test, label_order)
+
+    split_df = pd.DataFrame(
+        {
+            "sample_id": list(meta_task.iloc[train_idx]["sample_id"])
+            + list(meta_task.iloc[val_idx]["sample_id"])
+            + list(meta_task.iloc[test_idx]["sample_id"]),
+            "split": ["train"] * len(train_idx) + ["val"] * len(val_idx) + ["test"] * len(test_idx),
+            "participant_id": list(g_train) + list(g_val) + list(g_test),
+            "label": [label_order[i] for i in y_train]
+            + [label_order[i] for i in y_val]
+            + [label_order[i] for i in y_test],
+        }
+    )
+    split_df.to_csv(task_dir / "single_grouped_train_val_test_split.csv", index=False)
+
+    model = make_model(
+        C=args.C,
+        max_iter=args.max_iter,
+        tol=args.tol,
+        seed=args.seed,
+        n_jobs=args.n_jobs,
+        verbose=args.sklearn_verbose,
+    )
+
+    model.fit(X_train, y_train)
+
+    rows = []
+    for name, Xs, ys, gs in [
+        ("train", X_train, y_train, g_train),
+        ("val", X_val, y_val, g_val),
+        ("test", X_test, y_test, g_test),
+    ]:
+        row = evaluate_split(
+            name,
+            model,
+            Xs,
+            ys,
+            label_order,
+            task_dir / f"single_split_{name}_report.txt",
+        )
+        row["participants"] = int(len(set(gs)))
+        rows.append(row)
+
+    X_trainval = np.concatenate([X_train, X_val], axis=0)
+    y_trainval = np.concatenate([y_train, y_val], axis=0)
+
+    final_model = make_model(
+        C=args.C,
+        max_iter=args.max_iter,
+        tol=args.tol,
+        seed=args.seed,
+        n_jobs=args.n_jobs,
+        verbose=args.sklearn_verbose,
+    )
+
+    final_model.fit(X_trainval, y_trainval)
+
+    print("\n=== FINAL MODEL (train+val fit, held-out test evaluation) ===")
+    final_row = evaluate_split(
+        "final_test",
+        final_model,
+        X_test,
+        y_test,
+        label_order,
+        task_dir / "final_trainval_test_report.txt",
+    )
+    final_row["participants"] = int(len(set(g_test)))
+    rows.append(final_row)
+
+    pd.DataFrame(rows).to_csv(task_dir / "single_grouped_train_val_test_results.csv", index=False)
+
+    write_interpretation_tables(
+        final_model,
+        X_trainval,
+        y_trainval,
+        feature_meta,
+        spec,
+        task_dir,
+        args.top_n,
+        args.max_process_rows,
+    )
+
+
+def write_interpretation_tables(
+    final_model: Pipeline,
+    X_interpret: np.ndarray,
+    y_interpret: np.ndarray,
+    feature_meta: pd.DataFrame,
+    spec: dict[str, Any],
+    task_dir: Path,
+    top_n: int,
+    max_process_rows: int,
+):
+    scaler = final_model.named_steps["scaler"]
+    clf = final_model.named_steps["clf"]
+
+    Xz = scaler.transform(X_interpret)
+    coef = clf.coef_.astype(float)
+
+    if coef.shape[0] == 1:
+        beta = coef[0]
+        avg_push = np.mean(np.abs(Xz * beta.reshape(1, -1)), axis=0)
+
+        coef_df = feature_meta.copy()
+        coef_df["class"] = spec["label_order"][1]
+        coef_df["beta_standardised"] = beta
+        coef_df["average_realised_push"] = avg_push
+        selected = coef_df[np.abs(coef_df["beta_standardised"]) > 1e-12].copy()
+        selected = selected.sort_values("beta_standardised", key=lambda s: s.abs(), ascending=False)
+
+        print(f"\nNonzero coefficients: {len(selected)} / {coef.shape[1]}")
+        selected.to_csv(task_dir / "selected_coefficients_final_trainval_model.csv", index=False)
+
+        write_binary_top_feature_tables(selected, spec, task_dir, top_n)
+        write_binary_process_tables(selected, spec, task_dir, max_process_rows)
+
+    else:
+        rows = []
+        for ci, cname in enumerate(spec["label_order"]):
+            beta = coef[ci]
+            avg_push = np.mean(np.abs(Xz * beta.reshape(1, -1)), axis=0)
+
+            temp = feature_meta.copy()
+            temp["class"] = cname
+            temp["class_index"] = ci
+            temp["beta_standardised"] = beta
+            temp["average_realised_push"] = avg_push
+            temp = temp[np.abs(temp["beta_standardised"]) > 1e-12].copy()
+            rows.append(temp)
+
+        selected = pd.concat(rows, axis=0, ignore_index=True) if rows else pd.DataFrame()
+        selected = selected.sort_values("beta_standardised", key=lambda s: s.abs(), ascending=False)
+
+        print(f"\nNonzero coefficients: {len(selected)} / {coef.shape[0] * coef.shape[1]}")
+        selected.to_csv(task_dir / "selected_coefficients_final_trainval_model.csv", index=False)
+
+        write_multiclass_top_feature_tables(selected, spec, task_dir, top_n)
+        write_multiclass_process_tables(selected, spec, task_dir, max_process_rows)
+
+
+def write_binary_top_feature_tables(selected: pd.DataFrame, spec: dict[str, Any], task_dir: Path, top_n: int):
+    cols = [
+        "feature",
+        "feature_type",
+        "edge",
+        "edge_display",
+        "process",
+        "beta_standardised",
+        "average_realised_push",
+    ]
+
+    top_abs = selected.sort_values("beta_standardised", key=lambda s: s.abs(), ascending=False).head(top_n)
+    top_pos = selected.sort_values("beta_standardised", ascending=False).head(top_n)
+    top_neg = selected.sort_values("beta_standardised", ascending=True).head(top_n)
+
+    top_abs[cols].to_csv(task_dir / "top_absolute_features.csv", index=False)
+    top_pos[cols].to_csv(task_dir / "top_positive_features.csv", index=False)
+    top_neg[cols].to_csv(task_dir / "top_negative_features.csv", index=False)
+
+    selected[(selected["feature_type"] == "B")].sort_values("beta_standardised", ascending=False).head(top_n)[cols].to_csv(
+        task_dir / "top_positive_B_features.csv", index=False
+    )
+    selected[(selected["feature_type"] == "K0")].sort_values("beta_standardised", ascending=False).head(top_n)[cols].to_csv(
+        task_dir / "top_positive_K0_features.csv", index=False
+    )
+    selected[(selected["feature_type"] == "B")].sort_values("beta_standardised", ascending=True).head(top_n)[cols].to_csv(
+        task_dir / "top_negative_B_features.csv", index=False
+    )
+    selected[(selected["feature_type"] == "K0")].sort_values("beta_standardised", ascending=True).head(top_n)[cols].to_csv(
+        task_dir / "top_negative_K0_features.csv", index=False
+    )
+
+    print(f"\nTop + features (push toward {spec['label_order'][1]}):")
+    print(top_pos[cols].to_string(index=False))
+
+    print(f"\nTop - features (push away from {spec['label_order'][1]}):")
+    print(top_neg[cols].to_string(index=False))
+
+    latex_top = top_abs[["edge_display", "process", "feature_type", "beta_standardised", "average_realised_push"]].copy()
+    latex_top.columns = ["Edge", "Process", "Dominant", "Coefficient beta", "Average imp."]
+    write_generic_latex(
+        latex_top,
+        task_dir / "latex_top_absolute_features.tex",
+        f"Top absolute-value features in the original-style {spec['display']} Ricci classifier. Coefficients are on standardised features.",
+    )
+
+
+def write_multiclass_top_feature_tables(selected: pd.DataFrame, spec: dict[str, Any], task_dir: Path, top_n: int):
+    cols = [
+        "class",
+        "feature",
+        "feature_type",
+        "edge",
+        "edge_display",
+        "process",
+        "beta_standardised",
+        "average_realised_push",
+    ]
+
+    top_abs = selected.sort_values("beta_standardised", key=lambda s: s.abs(), ascending=False).head(top_n)
+    top_abs[cols].to_csv(task_dir / "top_absolute_features.csv", index=False)
+
+    print("\nTop absolute-value multiclass features:")
+    print(top_abs[cols].to_string(index=False))
+
+    latex_top = top_abs[["class", "edge_display", "process", "feature_type", "beta_standardised", "average_realised_push"]].copy()
+    latex_top.columns = ["Class", "Edge", "Process", "Dom.", "beta", "Avg. imp."]
+    write_generic_latex(
+        latex_top,
+        task_dir / "latex_top_absolute_features.tex",
+        f"Top absolute-value features in the original-style {spec['display']} Ricci classifier. Coefficients are on standardised features.",
+    )
+
+
+def write_binary_process_tables(selected: pd.DataFrame, spec: dict[str, Any], task_dir: Path, max_process_rows: int):
+    rows = []
+
+    for proc, sub in selected.groupby("process"):
+        bsub = sub[sub["feature_type"] == "B"]
+        ksub = sub[sub["feature_type"] == "K0"]
+
+        rows.append(
+            {
+                "Process": proc,
+                "Total Coeff.": sub["beta_standardised"].abs().sum(),
+                "Features": len(sub),
+                "Edges": sub["edge"].nunique(),
+                "Mean |coeff|": sub["beta_standardised"].abs().mean(),
+                "Mean B coeff": bsub["beta_standardised"].mean() if len(bsub) else np.nan,
+                "Mean K0 coeff": ksub["beta_standardised"].mean() if len(ksub) else np.nan,
+                "% positive K0": 100.0 * (ksub["beta_standardised"] > 0).mean() if len(ksub) else np.nan,
+                "K0 features": len(ksub),
+            }
+        )
+
+    proc_df = pd.DataFrame(rows).sort_values("Total Coeff.", ascending=False)
+    proc_df.to_csv(task_dir / "process_coefficient_table.csv", index=False)
+
+    rows = []
+    for proc, sub in selected.groupby("process"):
+        b_imp = sub.loc[sub["feature_type"] == "B", "average_realised_push"].sum()
+        k_imp = sub.loc[sub["feature_type"] == "K0", "average_realised_push"].sum()
+
+        rows.append(
+            {
+                "Process category": proc,
+                "Total imp.": b_imp + k_imp,
+                "B imp.": b_imp,
+                "K0 imp.": k_imp,
+            }
+        )
+
+    imp_df = pd.DataFrame(rows).sort_values("Total imp.", ascending=False)
+    imp_df.to_csv(task_dir / "process_realised_push_table.csv", index=False)
+
+    write_generic_latex(
+        proc_df.head(max_process_rows),
+        task_dir / "latex_process_coefficient_table.tex",
+        f"Biological process coefficient table for the original-style {spec['display']} Ricci classifier. Coefficients are signed with respect to {spec['label_order'][1]}.",
+    )
+
+    write_generic_latex(
+        imp_df.head(max_process_rows),
+        task_dir / "latex_process_realised_push_table.tex",
+        f"Total realised push by process category for the original-style {spec['display']} Ricci classifier.",
+    )
+
+
+def write_multiclass_process_tables(selected: pd.DataFrame, spec: dict[str, Any], task_dir: Path, max_process_rows: int):
+    label_order = spec["label_order"]
+
+    rows = []
+    for proc, sub in selected.groupby("process"):
+        row = {
+            "Process": proc,
+            "Total Coeff.": sub["beta_standardised"].abs().sum(),
+            "Features": len(sub),
+            "Edges": sub["edge"].nunique(),
+            "Mean |beta|": sub["beta_standardised"].abs().mean(),
+        }
+
+        for cname in label_order:
+            for ftype in ["B", "K0"]:
+                ss = sub[(sub["class"] == cname) & (sub["feature_type"] == ftype)]
+                row[f"{ftype}_{cname}"] = ss["beta_standardised"].mean() if len(ss) else np.nan
+
+        rows.append(row)
+
+    proc_df = pd.DataFrame(rows).sort_values("Total Coeff.", ascending=False)
+    proc_df.to_csv(task_dir / "process_coefficient_table.csv", index=False)
+
+    rows = []
+    for proc, sub in selected.groupby("process"):
+        row = {"Process": proc, "Total imp.": sub["average_realised_push"].sum()}
+        for cname in label_order:
+            for ftype in ["K0", "B"]:
+                ss = sub[(sub["class"] == cname) & (sub["feature_type"] == ftype)]
+                row[f"{cname} {ftype}"] = ss["average_realised_push"].sum()
+        rows.append(row)
+
+    imp_df = pd.DataFrame(rows).sort_values("Total imp.", ascending=False)
+    imp_df.to_csv(task_dir / "process_realised_push_table.csv", index=False)
+
+    write_generic_latex(
+        proc_df.head(max_process_rows),
+        task_dir / "latex_process_coefficient_table.tex",
+        f"Biological process coefficient table for the original-style {spec['display']} Ricci classifier.",
+    )
+
+    write_generic_latex(
+        imp_df.head(max_process_rows),
+        task_dir / "latex_process_realised_push_table.tex",
+        f"Total realised push by process category for the original-style {spec['display']} Ricci classifier.",
+    )
+
+
+def write_generic_latex(df: pd.DataFrame, out_path: Path, caption: str):
     if df is None or len(df) == 0:
         out_path.write_text(
             "\\begin{table}[ht]\n\\centering\n"
@@ -1198,6 +1066,7 @@ def write_df_latex(df: pd.DataFrame, out_path: Path, caption: str):
         return
 
     pretty = df.copy()
+
     for c in pretty.columns:
         if pd.api.types.is_float_dtype(pretty[c]):
             pretty[c] = pretty[c].map(lambda x: "--" if pd.isna(x) else f"{float(x):.3f}")
@@ -1207,6 +1076,7 @@ def write_df_latex(df: pd.DataFrame, out_path: Path, caption: str):
             pretty[c] = pretty[c].map(lambda x: "--" if pd.isna(x) else str(x))
 
     align = "l" * len(pretty.columns)
+
     lines = [
         r"\begin{table}[ht]",
         r"\centering",
@@ -1225,470 +1095,71 @@ def write_df_latex(df: pd.DataFrame, out_path: Path, caption: str):
     out_path.write_text("\n".join(lines) + "\n")
 
 
-def run_task(X, matched: pd.DataFrame, task_key: str, args, out_dir: Path):
-    spec = TASKS[task_key]
-    task_dir = out_dir / spec["folder"]
-    task_dir.mkdir(parents=True, exist_ok=True)
-
-    X_task, y, meta_task = task_subset(X, matched, task_key)
-    groups = meta_task["participant_id"].to_numpy()
-    n_classes = len(spec["class_names"])
-
-    outer_splits = safe_group_splits(y, groups, args.outer_splits, spec["display"] + " outer")
-    sgkf = StratifiedGroupKFold(n_splits=outer_splits, shuffle=True, random_state=args.seed)
-
-    fold_rows = []
-    all_true = []
-    all_pred = []
-    pred_rows = []
-    selected_rows = []
-    all_val_rows = []
-
-    for fold, (tr, te) in enumerate(sgkf.split(X_task, y, groups), start=1):
-        print(f"\n[{spec['display']}] outer fold {fold}/{outer_splits}", flush=True)
-
-        selected, val_df = select_hyperparameters(
-            X_train=X_task[tr],
-            y_train=y[tr],
-            groups_train=groups[tr],
-            n_classes=n_classes,
-            task_display=spec["display"],
-            args=args,
-        )
-
-        val_df.insert(0, "outer_fold", fold)
-        all_val_rows.append(val_df)
-
-        model = make_model(
-            C=selected["C"],
-            class_weight_name=selected["class_weight"],
-            max_iter=args.max_iter,
-            tol=args.tol,
-            seed=args.seed + fold,
-            n_jobs=args.n_jobs,
-        )
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", ConvergenceWarning)
-            model.fit(X_task[tr], y[tr])
-            conv = any(isinstance(w.message, ConvergenceWarning) for w in caught)
-
-        pred = model.predict(X_task[te])
-        proba = model.predict_proba(X_task[te])
-        metrics = score_predictions(y[te], pred, proba, n_classes)
-
-        nnz = int(np.count_nonzero(np.abs(model.coef_) > 1e-12))
-
-        row = {
-            "fold": fold,
-            "train_samples": int(len(tr)),
-            "test_samples": int(len(te)),
-            "train_participants": int(len(set(groups[tr]))),
-            "test_participants": int(len(set(groups[te]))),
-            "selected_C": selected["C"],
-            "selected_class_weight": selected["class_weight"],
-            "inner_val_balanced_accuracy": selected["val_balanced_accuracy"],
-            "inner_val_macro_f1": selected["val_macro_f1"],
-            "inner_val_roc_auc": selected["val_roc_auc"],
-            "accuracy": metrics["accuracy"],
-            "balanced_accuracy": metrics["balanced_accuracy"],
-            "macro_f1": metrics["macro_f1"],
-            "roc_auc": metrics["roc_auc"],
-            "n_nonzero_coefficients": nnz,
-            "convergence_warning": bool(conv),
-        }
-        fold_rows.append(row)
-
-        selected_rows.append(
-            {
-                "fold": fold,
-                "C": selected["C"],
-                "class_weight": selected["class_weight"],
-                "inner_val_balanced_accuracy": selected["val_balanced_accuracy"],
-                "inner_val_macro_f1": selected["val_macro_f1"],
-                "inner_val_roc_auc": selected["val_roc_auc"],
-            }
-        )
-
-        all_true.extend(y[te].tolist())
-        all_pred.extend(pred.tolist())
-
-        for local_idx, yy, pp, prob in zip(te, y[te], pred, proba):
-            prow = {
-                "fold": fold,
-                "sample_id": meta_task.iloc[local_idx]["sample_id"],
-                "participant_id": meta_task.iloc[local_idx]["participant_id"],
-                "true_label": spec["class_names"][int(yy)],
-                "pred_label": spec["class_names"][int(pp)],
-            }
-            for ci, cname in enumerate(spec["class_names"]):
-                prow[f"proba_{cname}"] = float(prob[ci])
-            pred_rows.append(prow)
-
-        print(
-            f"  selected C={selected['C']}, class_weight={selected['class_weight']} | "
-            f"test acc={metrics['accuracy']:.3f}, bacc={metrics['balanced_accuracy']:.3f}, "
-            f"f1={metrics['macro_f1']:.3f}, auc={metrics['roc_auc']:.3f}",
-            flush=True,
-        )
-
-    fold_df = pd.DataFrame(fold_rows)
-    selected_df = pd.DataFrame(selected_rows)
-    val_all = pd.concat(all_val_rows, axis=0, ignore_index=True) if all_val_rows else pd.DataFrame()
-    pred_df = pd.DataFrame(pred_rows)
-
-    cm = confusion_matrix(all_true, all_pred, labels=list(range(n_classes)))
-
-    fold_df.to_csv(task_dir / "nested_outer_fold_results.csv", index=False)
-    selected_df.to_csv(task_dir / "selected_hyperparameters_by_outer_fold.csv", index=False)
-    val_all.to_csv(task_dir / "inner_validation_grid_results.csv", index=False)
-    pred_df.to_csv(task_dir / "outer_test_predictions.csv", index=False)
-    pd.DataFrame(cm, index=spec["class_names"], columns=spec["class_names"]).to_csv(task_dir / "outer_test_confusion_matrix.csv")
-
-    write_fold_latex(fold_df, spec, task_dir / "latex_nested_outer_fold_results.tex")
-    write_confusion_latex(cm, spec["class_names"], spec["display"], task_dir / "latex_outer_test_confusion_matrix.tex")
-
-    return {
-        "task_key": task_key,
-        "spec": spec,
-        "task_dir": task_dir,
-        "X_task": X_task,
-        "y": y,
-        "meta_task": meta_task,
-        "fold_df": fold_df,
-        "selected_df": selected_df,
-        "cm": cm,
-    }
-
-
-def choose_interpretation_hyperparams(selected_df: pd.DataFrame) -> dict[str, Any]:
-    temp = selected_df.copy()
-    grouped = (
-        temp
-        .groupby(["C", "class_weight"], as_index=False)
-        .agg(
-            count=("fold", "count"),
-            mean_inner_val_balanced_accuracy=("inner_val_balanced_accuracy", "mean"),
-            mean_inner_val_macro_f1=("inner_val_macro_f1", "mean"),
-            mean_inner_val_roc_auc=("inner_val_roc_auc", "mean"),
-        )
-    )
-
-    grouped["cw_rank"] = grouped["class_weight"].map({"balanced": 0, "none": 1}).fillna(2)
-    grouped = grouped.sort_values(
-        ["count", "mean_inner_val_balanced_accuracy", "mean_inner_val_macro_f1", "mean_inner_val_roc_auc", "C", "cw_rank"],
-        ascending=[False, False, False, False, True, True],
-        na_position="last",
-    ).reset_index(drop=True)
-
-    row = grouped.iloc[0]
-    return {
-        "C": float(row["C"]),
-        "class_weight": str(row["class_weight"]),
-        "selection_table": grouped,
-    }
-
-
-def mean_abs_sparse(X):
-    Y = X.copy()
-    Y.data = np.abs(Y.data)
-    return np.asarray(Y.mean(axis=0)).ravel()
-
-
-def make_feature_info(j: int, n_edges: int, edge_names: list[str], processes: list[str]):
-    if j < n_edges:
-        return "B", j, edge_names[j], processes[j]
-    idx = j - n_edges
-    return "K0", idx, edge_names[idx], processes[idx]
-
-
-def interpretation_tables(result: dict[str, Any], edge_meta: pd.DataFrame, args):
-    spec = result["spec"]
-    task_dir = result["task_dir"]
-    out_dir = task_dir / "interpretation_final_refit"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    params = choose_interpretation_hyperparams(result["selected_df"])
-    params["selection_table"].to_csv(out_dir / "hyperparameter_selection_counts.csv", index=False)
-    write_df_latex(
-        params["selection_table"],
-        out_dir / "latex_hyperparameter_selection_counts.tex",
-        f"Hyperparameter settings selected across outer folds for {spec['display']}.",
-    )
-
-    model = make_model(
-        C=params["C"],
-        class_weight_name=params["class_weight"],
-        max_iter=args.max_iter,
-        tol=args.tol,
-        seed=args.seed + 9999,
-        n_jobs=args.n_jobs,
-    )
-
-    model.fit(result["X_task"], result["y"])
-
-    n_edges = len(edge_meta)
-    edge_names = edge_meta["edge"].astype(str).tolist()
-    processes = edge_meta["process"].fillna("Unannotated").astype(str).tolist()
-    mean_abs_x = mean_abs_sparse(result["X_task"])
-
-    with open(out_dir / "final_refit_hyperparameters.json", "w") as f:
-        json.dump({"C": params["C"], "class_weight": params["class_weight"]}, f, indent=2)
-
-    if spec["kind"] == "binary":
-        beta = model.coef_[0].astype(float)
-        binary_interpretation_tables(
-            beta=beta,
-            mean_abs_x=mean_abs_x,
-            edge_names=edge_names,
-            processes=processes,
-            n_edges=n_edges,
-            task_display=spec["display"],
-            positive_name=spec["positive_name"],
-            out_dir=out_dir,
-            max_process_rows=args.max_process_rows,
-            top_n=args.top_n,
-        )
-    else:
-        beta = model.coef_.astype(float)
-        multiclass_interpretation_tables(
-            beta=beta,
-            mean_abs_x=mean_abs_x,
-            edge_names=edge_names,
-            processes=processes,
-            n_edges=n_edges,
-            class_names=spec["class_names"],
-            task_display=spec["display"],
-            out_dir=out_dir,
-            max_process_rows=args.max_process_rows,
-            top_n=args.top_n,
-        )
-
-
-def binary_interpretation_tables(
-    beta,
-    mean_abs_x,
-    edge_names,
-    processes,
-    n_edges,
-    task_display,
-    positive_name,
-    out_dir,
-    max_process_rows,
-    top_n,
-):
-    nz = np.where(np.abs(beta) > 1e-12)[0]
-
+def write_summary_tables(results: dict[str, dict[str, Any]], out_dir: Path):
     rows = []
-    for j in nz:
-        ftype, ei, edge, proc = make_feature_info(j, n_edges, edge_names, processes)
+    for task_key, result in results.items():
+        fold_df = result["fold_df"]
         rows.append(
             {
-                "feature_index": int(j),
-                "edge_index": int(ei),
-                "edge": edge,
-                "process": proc,
-                "feature_type": ftype,
-                "beta": float(beta[j]),
-                "average_importance": float(abs(beta[j]) * mean_abs_x[j]),
-                "positive_class": positive_name,
+                "Task": TASKS[task_key]["display"],
+                "Accuracy": fmt_mean_sd(fold_df["accuracy"].mean(), fold_df["accuracy"].std(ddof=0)),
+                "Balanced acc.": fmt_mean_sd(fold_df["balanced_accuracy"].mean(), fold_df["balanced_accuracy"].std(ddof=0)),
+                "Macro F1": fmt_mean_sd(fold_df["macro_f1"].mean(), fold_df["macro_f1"].std(ddof=0)),
+                "ROC-AUC": fmt_mean_sd(fold_df["roc_auc"].mean(), fold_df["roc_auc"].std(ddof=0)),
             }
         )
-
-    coef_df = pd.DataFrame(rows)
-    coef_df.to_csv(out_dir / "feature_coefficients.csv", index=False)
-
-    if coef_df.empty:
-        return
-
-    proc_rows = []
-    for proc, sub in coef_df.groupby("process"):
-        bsub = sub[sub["feature_type"] == "B"]
-        ksub = sub[sub["feature_type"] == "K0"]
-        proc_rows.append(
-            {
-                "Process": proc,
-                "Total Coeff.": sub["beta"].abs().sum(),
-                "Features": len(sub),
-                "Edges": sub["edge"].nunique(),
-                "Mean |coeff|": sub["beta"].abs().mean(),
-                "Mean B coeff": bsub["beta"].mean() if len(bsub) else np.nan,
-                "Mean K0 coeff": ksub["beta"].mean() if len(ksub) else np.nan,
-                "% positive K0": 100.0 * (ksub["beta"] > 0).mean() if len(ksub) else np.nan,
-                "K0 features": len(ksub),
-            }
-        )
-
-    proc_df = pd.DataFrame(proc_rows).sort_values("Total Coeff.", ascending=False)
-    proc_df.to_csv(out_dir / "process_coefficient_table.csv", index=False)
-    write_df_latex(
-        proc_df.head(max_process_rows),
-        out_dir / "latex_process_coefficient_table.tex",
-        f"Biological process coefficient table for {task_display}. Positive coefficients correspond to {positive_name}.",
-    )
-
-    imp_rows = []
-    for proc, sub in coef_df.groupby("process"):
-        b_imp = sub.loc[sub["feature_type"] == "B", "average_importance"].sum()
-        k_imp = sub.loc[sub["feature_type"] == "K0", "average_importance"].sum()
-        imp_rows.append(
-            {
-                "Process category": proc,
-                "Total imp.": b_imp + k_imp,
-                "B imp.": b_imp,
-                "K0 imp.": k_imp,
-            }
-        )
-
-    imp_df = pd.DataFrame(imp_rows).sort_values("Total imp.", ascending=False)
-    imp_df.to_csv(out_dir / "process_realised_importance_table.csv", index=False)
-    write_df_latex(
-        imp_df.head(max_process_rows),
-        out_dir / "latex_process_realised_importance_table.tex",
-        f"Total realised push by process category for {task_display}.",
-    )
-
-    top = coef_df.sort_values("beta", key=lambda s: s.abs(), ascending=False).head(top_n).copy()
-    top = top[["positive_class", "edge", "process", "feature_type", "beta", "average_importance"]]
-    top.columns = ["Class", "Edge", "Process", "Dominant", "Coefficient beta", "Average imp."]
-    top.to_csv(out_dir / "top_absolute_features.csv", index=False)
-    write_df_latex(
-        top,
-        out_dir / "latex_top_absolute_features.tex",
-        f"Top absolute-value Ricci features for {task_display}.",
-    )
-
-
-def multiclass_interpretation_tables(
-    beta,
-    mean_abs_x,
-    edge_names,
-    processes,
-    n_edges,
-    class_names,
-    task_display,
-    out_dir,
-    max_process_rows,
-    top_n,
-):
-    rows = []
-
-    for ci, cname in enumerate(class_names):
-        nz = np.where(np.abs(beta[ci]) > 1e-12)[0]
-        for j in nz:
-            ftype, ei, edge, proc = make_feature_info(j, n_edges, edge_names, processes)
-            rows.append(
-                {
-                    "class": cname,
-                    "class_index": ci,
-                    "feature_index": int(j),
-                    "edge_index": int(ei),
-                    "edge": edge,
-                    "process": proc,
-                    "feature_type": ftype,
-                    "beta": float(beta[ci, j]),
-                    "average_importance": float(abs(beta[ci, j]) * mean_abs_x[j]),
-                }
-            )
-
-    coef_df = pd.DataFrame(rows)
-    coef_df.to_csv(out_dir / "feature_coefficients_multiclass_long.csv", index=False)
-
-    if coef_df.empty:
-        return
-
-    proc_rows = []
-    for proc, sub in coef_df.groupby("process"):
-        row = {
-            "Process": proc,
-            "Total Coeff.": sub["beta"].abs().sum(),
-            "Features": len(sub),
-            "Edges": sub["edge"].nunique(),
-            "Mean |beta|": sub["beta"].abs().mean(),
-        }
-
-        for cname in class_names:
-            for ftype in ["B", "K0"]:
-                ss = sub[(sub["class"] == cname) & (sub["feature_type"] == ftype)]
-                row[f"{ftype}_{cname}"] = ss["beta"].mean() if len(ss) else np.nan
-
-        proc_rows.append(row)
-
-    proc_df = pd.DataFrame(proc_rows).sort_values("Total Coeff.", ascending=False)
-    proc_df.to_csv(out_dir / "process_coefficient_table.csv", index=False)
-    write_df_latex(
-        proc_df.head(max_process_rows),
-        out_dir / "latex_process_coefficient_table.tex",
-        f"Biological process coefficient table for the {task_display} Ricci classifier.",
-    )
-
-    imp_rows = []
-    for proc, sub in coef_df.groupby("process"):
-        row = {"Process": proc, "Total imp.": sub["average_importance"].sum()}
-        for cname in class_names:
-            for ftype in ["K0", "B"]:
-                ss = sub[(sub["class"] == cname) & (sub["feature_type"] == ftype)]
-                row[f"{cname} {ftype}"] = ss["average_importance"].sum()
-        imp_rows.append(row)
-
-    imp_df = pd.DataFrame(imp_rows).sort_values("Total imp.", ascending=False)
-    imp_df.to_csv(out_dir / "process_realised_importance_table.csv", index=False)
-    write_df_latex(
-        imp_df.head(max_process_rows),
-        out_dir / "latex_process_realised_importance_table.tex",
-        f"Total realised push by process category for the {task_display} Ricci classifier.",
-    )
-
-    top = coef_df.sort_values("beta", key=lambda s: s.abs(), ascending=False).head(top_n).copy()
-    top = top[["class", "edge", "process", "feature_type", "beta", "average_importance"]]
-    top.columns = ["Class", "Edge", "Process", "Dom.", "beta", "Avg. imp."]
-    top.to_csv(out_dir / "top_absolute_features.csv", index=False)
-    write_df_latex(
-        top,
-        out_dir / "latex_top_absolute_features.tex",
-        f"Top absolute-value features from the {task_display} Ricci classifier.",
-    )
-
-
-def write_all_task_summary(results: dict[str, Any], out_dir: Path):
-    rows = []
-
-    for task_key, res in results.items():
-        df = res["fold_df"]
-        row = {"Task": TASKS[task_key]["display"]}
-        for metric in ["accuracy", "balanced_accuracy", "macro_f1", "roc_auc"]:
-            row[metric] = fmt_mean_sd(df[metric].mean(), df[metric].std(ddof=0))
-        rows.append(row)
 
     summary = pd.DataFrame(rows)
-    summary.to_csv(out_dir / "nested_ricci_all_task_summary.csv", index=False)
+    summary.to_csv(out_dir / "all_task_summary.csv", index=False)
 
     lines = [
         r"\begin{table}[ht]",
         r"\centering",
-        r"\caption{Nested participant-grouped Ricci classification performance. Hyperparameters are selected inside each outer training fold using participant-grouped validation. Values are mean $\pm$ SD across outer folds.}",
+        r"\caption{Summary of original-style participant-grouped Ricci classifier performance. The model uses fold-internal standardisation of $[B\mid K_0]$ features and L1 logistic regression. Values are mean $\pm$ SD across five folds.}",
         r"\begin{tabular}{lrrrr}",
         r"\toprule",
-        r"Task & Accuracy & Balanced accuracy & Macro F1 & ROC-AUC \\",
+        r"Task & Accuracy & Balanced acc. & Macro F1 & ROC-AUC \\",
         r"\midrule",
     ]
 
     for _, r in summary.iterrows():
         lines.append(
-            f"{latex_escape(r['Task'])} & {r['accuracy']} & {r['balanced_accuracy']} & "
-            f"{r['macro_f1']} & {r['roc_auc']} \\\\"
+            f"{latex_escape(r['Task'])} & {r['Accuracy']} & {r['Balanced acc.']} & {r['Macro F1']} & {r['ROC-AUC']} \\\\"
         )
 
     lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
-    (out_dir / "latex_nested_ricci_all_task_summary.tex").write_text("\n".join(lines) + "\n")
+    (out_dir / "latex_all_task_summary.tex").write_text("\n".join(lines) + "\n")
+
+    pairwise_keys = ["nonibd_vs_uc", "nonibd_vs_cd", "cd_vs_uc"]
+    pairwise_rows = [r for key, r in zip(results.keys(), rows) if key in pairwise_keys]
+    pairwise = pd.DataFrame(pairwise_rows)
+    pairwise.to_csv(out_dir / "pairwise_binary_summary.csv", index=False)
+
+    lines = [
+        r"\begin{table}[ht]",
+        r"\centering",
+        r"\caption{Summary of participant-grouped pairwise Ricci binary classification performance using the original-style standardised classifier. Values are mean $\pm$ SD across five folds.}",
+        r"\begin{tabular}{lrrrr}",
+        r"\toprule",
+        r"Task & Accuracy & Balanced acc. & Macro F1 & ROC-AUC \\",
+        r"\midrule",
+    ]
+
+    for _, r in pairwise.iterrows():
+        lines.append(
+            f"{latex_escape(r['Task'])} & {r['Accuracy']} & {r['Balanced acc.']} & {r['Macro F1']} & {r['ROC-AUC']} \\\\"
+        )
+
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+    (out_dir / "latex_pairwise_binary_summary.tex").write_text("\n".join(lines) + "\n")
 
 
-def collect_latex(results: dict[str, Any], out_dir: Path):
+def collect_latex(results: dict[str, dict[str, Any]], out_dir: Path):
     parts = []
 
     for name in [
-        "latex_ricci_curvature_percentiles_participant_average.tex",
-        "latex_nested_ricci_all_task_summary.tex",
+        "latex_all_task_summary.tex",
+        "latex_pairwise_binary_summary.tex",
     ]:
         p = out_dir / name
         if p.exists():
@@ -1697,104 +1168,181 @@ def collect_latex(results: dict[str, Any], out_dir: Path):
     for task_key in results:
         task_dir = out_dir / TASKS[task_key]["folder"]
 
-        for rel in [
-            "latex_nested_outer_fold_results.tex",
-            "latex_outer_test_confusion_matrix.tex",
-            "interpretation_final_refit/latex_hyperparameter_selection_counts.tex",
-            "interpretation_final_refit/latex_process_coefficient_table.tex",
-            "interpretation_final_refit/latex_process_realised_importance_table.tex",
-            "interpretation_final_refit/latex_top_absolute_features.tex",
+        for name in [
+            "latex_fold_results.tex",
+            "latex_confusion_matrix.tex",
+            "latex_process_coefficient_table.tex",
+            "latex_process_realised_push_table.tex",
+            "latex_top_absolute_features.tex",
         ]:
-            p = task_dir / rel
+            p = task_dir / name
             if p.exists():
                 parts.append(p.read_text())
 
-    (out_dir / "latex_all_nested_ricci_tables.tex").write_text("\n\n".join(parts) + "\n")
+    (out_dir / "latex_all_original_style_ricci_tables.tex").write_text("\n\n".join(parts) + "\n")
+
+
+def maybe_save_task_feature_tables(X_task, y, meta_task, feature_meta, spec, task_dir):
+    """
+    Optional reproduction of original vector CSV outputs. These can be large.
+    """
+    n_features = X_task.shape[1]
+    n_edges = n_features // 2
+
+    idx = meta_task["sample_id"].astype(str).tolist()
+    feature_names = feature_meta["feature"].astype(str).tolist()
+
+    df = pd.DataFrame(X_task, index=idx, columns=feature_names)
+    df.index.name = "graph_id"
+
+    df_b = df.iloc[:, :n_edges]
+    df_k = df.iloc[:, n_edges:]
+
+    df_b.to_csv(task_dir / "ricci_edge_vectors_B.csv.gz", compression="gzip")
+    df_k.to_csv(task_dir / "ricci_edge_vectors_K0.csv.gz", compression="gzip")
+    df.to_csv(task_dir / "ricci_edge_vectors_BK0.csv.gz", compression="gzip")
+
+    labels = pd.DataFrame(
+        {
+            "sample_id": idx,
+            "participant_id": meta_task["participant_id"].astype(str).tolist(),
+            "label": [spec["label_order"][int(v)] for v in y],
+        }
+    )
+    labels.to_csv(task_dir / "task_labels.csv", index=False)
 
 
 def main():
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("--ricci-dir", default=None, help="Directory containing per-sample Ricci CSV/CSV.GZ files.")
-    ap.add_argument("--metadata", default=str(Path.home() / "Real_Data" / "hmp2_metadata.csv"))
-    ap.add_argument("--output-dir", required=True)
+    ap.add_argument(
+        "--feature-dir",
+        default=str(Path.home() / "Real_Data" / "Ricci_Classifier_Faithful_Eps0001_n250_v3"),
+        help="Directory containing feature_matrix_B_K0.npz, matched_metadata.csv, edge_metadata.csv.",
+    )
+    ap.add_argument(
+        "--output-dir",
+        default=str(Path.home() / "Real_Data" / "Ricci_Classifier_OriginalStyle_AllTasks_NewVectors"),
+    )
+    ap.add_argument(
+        "--edge-annotation-csv",
+        default=None,
+        help="Optional CSV containing edge-to-process annotations.",
+    )
 
-    ap.add_argument("--feature-dir", default=None, help="Directory containing existing feature_matrix_B_K0.npz, matched_metadata.csv, edge_metadata.csv.")
-    ap.add_argument("--reuse-features", action="store_true", help="Reuse feature files already present in output-dir.")
+    ap.add_argument(
+        "--tasks",
+        nargs="+",
+        default=list(TASKS.keys()),
+        choices=list(TASKS.keys()),
+    )
 
-    ap.add_argument("--ricci-glob", default=None)
-    ap.add_argument("--edge-annotation-csv", default=None)
-    ap.add_argument("--tasks", nargs="+", default=list(TASKS.keys()), choices=list(TASKS.keys()))
-
-    ap.add_argument("--C-grid", default="0.03,0.1,0.3,1,3,10")
-    ap.add_argument("--class-weight-grid", default="balanced,none")
-    ap.add_argument("--outer-splits", type=int, default=5)
-    ap.add_argument("--inner-splits", type=int, default=5)
-    ap.add_argument("--inner-mode", choices=["single", "cv"], default="single")
-
+    ap.add_argument("--C", type=float, default=0.02)
     ap.add_argument("--max-iter", type=int, default=8000)
     ap.add_argument("--tol", type=float, default=1e-4)
+    ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--n-splits", type=int, default=5)
     ap.add_argument("--n-jobs", type=int, default=1)
-    ap.add_argument("--seed", type=int, default=20260710)
-    ap.add_argument("--chunksize", type=int, default=250000)
-    ap.add_argument("--max-samples", type=int, default=None)
+    ap.add_argument("--sklearn-verbose", type=int, default=0)
 
-    ap.add_argument("--skip-ricci-diagnostics", action="store_true")
-    ap.add_argument("--skip-density", action="store_true")
-    ap.add_argument("--skip-interpretation", action="store_true")
+    ap.add_argument("--train-frac", type=float, default=0.70)
+    ap.add_argument("--val-frac", type=float, default=0.15)
+    ap.add_argument("--test-frac", type=float, default=0.15)
 
+    ap.add_argument("--top-n", type=int, default=30)
     ap.add_argument("--max-process-rows", type=int, default=40)
-    ap.add_argument("--top-n", type=int, default=25)
+
+    ap.add_argument(
+        "--skip-single-split",
+        action="store_true",
+        help="Skip original-style grouped train/val/test split and final train+val interpretation model.",
+    )
+    ap.add_argument(
+        "--save-task-feature-tables",
+        action="store_true",
+        help="Save task-specific dense B, K0, and BK0 feature CSV.GZ files. These can be large.",
+    )
 
     args = ap.parse_args()
 
+    feature_dir = Path(args.feature_dir).expanduser()
     out_dir = Path(args.output_dir).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    annotation_csv = Path(args.edge_annotation_csv).expanduser() if args.edge_annotation_csv else None
+
     config = vars(args).copy()
-    config["feature_definition"] = "[B | K0], with B(e)=1 if edge e is active/present and K0(e)=Ricci curvature if active/present; both zero otherwise."
-    config["outer_protocol"] = "Participant-grouped outer CV. Test participants are held out from hyperparameter selection."
-    config["inner_protocol"] = "Participant-grouped inner validation inside each outer-training fold. Select by validation balanced accuracy, macro F1 and ROC-AUC tie-breakers."
-    config["interpretation_protocol"] = "Final-refit coefficient tables use the most frequently selected hyperparameter setting for the task and are for interpretation only."
+    config["classifier"] = "Original-style Ricci classifier: StandardScaler(with_mean=True, with_std=True) + L1 LogisticRegression(solver=saga, class_weight=balanced)."
+    config["feature_definition"] = "[B | K0], where B is active-edge presence and K0 is Ricci curvature with missing edges set to zero."
+    config["cv_protocol"] = "StratifiedGroupKFold over participant IDs; scaler is fit inside the sklearn Pipeline on each training fold only."
+    config["coefficient_interpretation"] = "Coefficients are on standardised features. K0 coefficients correspond to deviations from the training-fold or final-model mean curvature for that edge."
+
     (out_dir / "run_config.json").write_text(json.dumps(config, indent=2, default=str))
 
-    metadata_all = load_metadata(Path(args.metadata).expanduser())
+    X_sparse, meta, edge_meta, feature_meta = load_inputs(feature_dir, annotation_csv)
 
-    if not args.feature_dir and not args.reuse_features and not args.ricci_dir:
-        raise ValueError("Provide --ricci-dir to build features, or --feature-dir / --reuse-features to reuse existing features.")
+    print("Loaded corrected Ricci feature matrix:")
+    print("  sparse shape:", X_sparse.shape)
+    print("  sparse nnz  :", X_sparse.nnz)
+    print("  metadata rows:", len(meta))
+    print("  participants:", meta["participant_id"].nunique())
+    print("\nParticipant counts by condition:")
+    print(meta.drop_duplicates("participant_id")["cond"].value_counts().to_string())
 
-    X, matched, edge_meta = build_or_load_features(args, metadata_all)
+    print("\nConverting sparse matrix to dense float32 for original-style StandardScaler...", flush=True)
+    X_dense = X_sparse.toarray().astype(np.float32, copy=False)
+    print("  dense shape:", X_dense.shape)
+    print("  dense memory MB:", X_dense.nbytes / 1024**2)
 
-    print("\nFinal feature matrix:", X.shape, "nnz=", X.nnz, flush=True)
-    print("Matched metadata rows:", len(matched), flush=True)
-    print("Unique participants:", matched["participant_id"].nunique(), flush=True)
-    print(matched.drop_duplicates("participant_id")["cond"].value_counts().to_string(), flush=True)
-
-    n_edges = len(edge_meta)
-    if X.shape[1] != 2 * n_edges:
-        raise ValueError(f"X has {X.shape[1]} columns but edge_meta has {n_edges} rows; expected 2*n_edges.")
-
-    if not args.skip_ricci_diagnostics:
-        ricci_percentiles_and_density(X, matched, edge_meta, out_dir, skip_density=args.skip_density)
+    feature_meta.to_csv(out_dir / "feature_metadata_used.csv", index=False)
+    edge_meta.to_csv(out_dir / "edge_metadata_used.csv", index=False)
 
     results = {}
+
     for task_key in args.tasks:
-        print("\n" + "=" * 100, flush=True)
-        print("Running nested task:", TASKS[task_key]["display"], flush=True)
-        print("=" * 100, flush=True)
+        spec = TASKS[task_key]
+        task_dir = out_dir / spec["folder"]
+        task_dir.mkdir(parents=True, exist_ok=True)
 
-        res = run_task(X, matched, task_key, args, out_dir)
-        results[task_key] = res
+        print("\n" + "=" * 100)
+        print("Running original-style Ricci task:", spec["display"])
+        print("=" * 100)
 
-        if not args.skip_interpretation:
-            interpretation_tables(res, edge_meta, args)
+        X_task, y, meta_task = make_task_data(X_dense, meta, task_key)
 
-    write_all_task_summary(results, out_dir)
+        print(f"Task samples: {len(y)}")
+        print(f"Task participants: {meta_task['participant_id'].nunique()}")
+        print("Sample counts:")
+        print(pd.Series([spec["label_order"][int(v)] for v in y]).value_counts().to_string())
+
+        if args.save_task_feature_tables:
+            maybe_save_task_feature_tables(X_task, y, meta_task, feature_meta, spec, task_dir)
+
+        fold_df, pred_df, cm = run_grouped_cv(X_task, y, meta_task, task_key, args, task_dir)
+
+        if not args.skip_single_split:
+            original_grouped_train_val_test_and_interpret(
+                X_task=X_task,
+                y=y,
+                meta_task=meta_task,
+                feature_meta=feature_meta,
+                task_key=task_key,
+                args=args,
+                task_dir=task_dir,
+            )
+
+        results[task_key] = {
+            "fold_df": fold_df,
+            "cm": cm,
+            "task_dir": task_dir,
+        }
+
+    write_summary_tables(results, out_dir)
     collect_latex(results, out_dir)
 
-    print("\n[READY] Nested faithful Ricci classifier finished.", flush=True)
-    print("Output directory:", out_dir, flush=True)
-    print("Combined LaTeX:", out_dir / "latex_all_nested_ricci_tables.tex", flush=True)
+    print("\n[READY] Original-style Ricci all-task run finished.")
+    print("Output directory:", out_dir)
+    print("Combined LaTeX:", out_dir / "latex_all_original_style_ricci_tables.tex")
 
 
 if __name__ == "__main__":
