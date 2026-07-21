@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "Please cite the associated manuscript and this software release."
-title: "Manifest-locked H0 Alpha-Pi classification across five IBD tasks"
+message: "If you use this software, please cite the associated manuscript."
+title: "Repeated faithful Ricci classifiers for all five IBDMDB tasks"
 type: software
 authors:
   - family-names: Loughridge
