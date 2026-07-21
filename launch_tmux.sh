@@ -1,52 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SESSION_NAME="${SESSION_NAME:-species_benchmarks_all_tasks_20x5}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_DATA_DIR="${REAL_DATA_DIR:-$HOME/Real_Data}"
-REPO_DIR="${REPO_DIR:-$REAL_DATA_DIR/species_benchmarks_all_tasks_20x5}"
-OUTPUT_DIR="${OUTPUT_DIR:-$REAL_DATA_DIR/Species_Benchmarks_RepeatedCV_AllTasks}"
-SPLIT_DIR="${SPLIT_DIR:-$REAL_DATA_DIR/H0_Ricci_JointSparse_RepeatedCV_AllTasks/splits}"
+SESSION_NAME="${SESSION_NAME:-h0_ricci_joint_all_tasks_1x5}"
+OUTPUT_DIR="${OUTPUT_DIR:-$REAL_DATA_DIR/H0_Ricci_JointSparse_RepeatedCV_AllTasks}"
 LOG_DIR="${LOG_DIR:-$REAL_DATA_DIR/logs}"
-LOG_FILE="${LOG_FILE:-$LOG_DIR/species_benchmarks_all_tasks_20x5.log}"
 N_JOBS="${N_JOBS:-1}"
 NICE_LEVEL="${NICE_LEVEL:-5}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+CORE_PYTHON="${CORE_PYTHON:-$REAL_DATA_DIR/h0_ricci_joint_sparse/.venv/bin/python}"
 
-command -v tmux >/dev/null 2>&1 || { echo "[error] tmux not found" >&2; exit 1; }
-[[ -f "$REPO_DIR/species_benchmarks_all_tasks.py" ]] || { echo "[error] Missing main script in $REPO_DIR" >&2; exit 1; }
-if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-  echo "[error] TMUX session already exists: $SESSION_NAME" >&2
+if ! command -v tmux >/dev/null 2>&1; then
+  echo "[ERROR] tmux is not installed or not on PATH." >&2
   exit 1
 fi
-for task in IBD_vs_nonIBD three_way_nonIBD_UC_CD nonIBD_vs_UC nonIBD_vs_CD CD_vs_UC; do
-  [[ -f "$SPLIT_DIR/${task}_split_manifest.csv" ]] || { echo "[error] Missing $SPLIT_DIR/${task}_split_manifest.csv" >&2; exit 1; }
-done
+
+if [[ ! -x "$CORE_PYTHON" ]]; then
+  echo "[ERROR] Core virtual-environment Python is missing or not executable:" >&2
+  echo "  $CORE_PYTHON" >&2
+  exit 1
+fi
+
 mkdir -p "$LOG_DIR"
-RUNNER_FILE="$LOG_DIR/${SESSION_NAME}_runner.sh"
-{
-  printf '#!/usr/bin/env bash\nset -euo pipefail\n'
-  printf 'cd %q\n' "$REPO_DIR"
-  printf 'export OMP_NUM_THREADS=%q\nexport MKL_NUM_THREADS=%q\nexport OPENBLAS_NUM_THREADS=%q\nexport NUMEXPR_NUM_THREADS=%q\n' "$N_JOBS" "$N_JOBS" "$N_JOBS" "$N_JOBS"
-  printf 'exec > >(tee -a %q) 2>&1\n' "$LOG_FILE"
-  printf 'echo %q\n' '=================================================================='
-  printf 'echo %q "$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)"\n' 'ALL-TASK SPECIES BENCHMARKS — started UTC:'
-  printf 'nice -n %q %q %q' "$NICE_LEVEL" "$PYTHON_BIN" "$REPO_DIR/species_benchmarks_all_tasks.py"
-  printf ' %q %q' --split-dir "$SPLIT_DIR"
-  printf ' %q %q' --output-dir "$OUTPUT_DIR"
-  printf ' %q %q' --n-jobs "$N_JOBS"
-  printf '\n'
-  printf 'echo %q "$(date -u +%%Y-%%m-%%dT%%H:%%M:%%SZ)"\n' 'Completed UTC:'
-} > "$RUNNER_FILE"
-chmod 700 "$RUNNER_FILE"
-bash -n "$RUNNER_FILE"
-tmux new-session -d -s "$SESSION_NAME" "bash $(printf '%q' "$RUNNER_FILE")"
+LOG_FILE="$LOG_DIR/h0_ricci_joint_all_tasks_1x5.log"
+COMMAND_FILE="$LOG_DIR/h0_ricci_joint_all_tasks_1x5_command.sh"
+
+cat > "$COMMAND_FILE" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$REPO_ROOT"
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+nice -n "$NICE_LEVEL" "$CORE_PYTHON" -u run_all_tasks.py \\
+  --output-dir "$OUTPUT_DIR" \\
+  --n-jobs "$N_JOBS" \\
+  2>&1 | tee -a "$LOG_FILE"
+EOF
+chmod +x "$COMMAND_FILE"
+
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+  echo "[ERROR] tmux session '$SESSION_NAME' already exists." >&2
+  echo "Attach with: tmux attach -t $SESSION_NAME" >&2
+  exit 1
+fi
+
+tmux new-session -d -s "$SESSION_NAME" "bash '$COMMAND_FILE'"
 sleep 2
 if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-  echo "[error] Session exited immediately; last log lines:" >&2
-  tail -n 80 "$LOG_FILE" >&2 || true
+  echo "[ERROR] The tmux session exited immediately. Inspect:" >&2
+  echo "  tail -100 '$LOG_FILE'" >&2
   exit 1
 fi
-echo "Started tmux session: $SESSION_NAME"
-echo "Attach: tmux attach -t $SESSION_NAME"
-echo "Log:    tail -f $LOG_FILE"
-echo "Output: $OUTPUT_DIR"
+
+cat <<EOF
+Started tmux session: $SESSION_NAME
+Task order: IBD vs non-IBD -> 3-way -> non-IBD vs UC -> non-IBD vs CD -> UC vs CD
+Requested range: repetition 1 only (25 outer folds total)
+Output: $OUTPUT_DIR
+Log:    $LOG_FILE
+Python:  $CORE_PYTHON
+Workers: $N_JOBS interval-count path(s), one BLAS thread each
+
+Attach:
+  tmux attach -t $SESSION_NAME
+
+Monitor:
+  tail -f "$LOG_FILE"
+
+Progress:
+  cat "$OUTPUT_DIR/progress.json"
+  column -s, -t < "$OUTPUT_DIR/progress_by_task.csv" | less -S
+EOF

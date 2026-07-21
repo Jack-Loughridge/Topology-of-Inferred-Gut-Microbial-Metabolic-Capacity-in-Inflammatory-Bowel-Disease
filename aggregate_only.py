@@ -12,4 +12,4 @@ if str(SRC) not in sys.path:
 from joint_repeated_cv.cli import main
 
 if __name__ == "__main__":
-    main([*sys.argv[1:], "--validate-only"])
+    main([*sys.argv[1:], "--aggregate-only"])

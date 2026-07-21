@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "h0-ricci-joint-repeated-cv-all-tasks"
+version = "2.0.1"
+description = "Repeated participant-grouped nested CV orchestration for joint H0 Alpha-Pi and faithful Ricci classification"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Jack Loughridge"}]
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.0",
+  "scikit-learn>=1.4",
+  "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+h0-ricci-joint-all-tasks = "joint_repeated_cv.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
