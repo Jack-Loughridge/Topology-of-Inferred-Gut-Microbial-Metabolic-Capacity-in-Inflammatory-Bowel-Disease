@@ -1,0 +1,10 @@
+{
+  "patch": "ALPHA_SMOOTHNESS_RESOLUTION_NORMALISATION_V1",
+  "patch_installer_version": "2.0",
+  "reference_intervals": 160,
+  "formula": "gamma_eff(M) = gamma * (M - 1) / (160 - 1)",
+  "source_profile": "core-v1.2.0-orthant-polish",
+  "original_model_sha256": "b0eff25de9bf1400d5d1e3a5d3576ba1233ffdeda3420596cf24de65ed8e8e8e",
+  "patched_model_sha256": "fc6d0a8ec94172900c9ac25e431e5dfb601f0eddf0674c4f389c0993d6d0a230",
+  "backup": "/home/Jack/Real_Data/h0_ricci_joint_sparse/.patch_backups/alpha_smoothness_resolution_20260720_223253"
+}

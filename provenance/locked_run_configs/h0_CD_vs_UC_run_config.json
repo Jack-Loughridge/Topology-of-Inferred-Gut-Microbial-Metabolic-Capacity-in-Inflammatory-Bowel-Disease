@@ -1,0 +1,85 @@
+{
+  "schema_version": 2,
+  "created_utc": "2026-08-11T06:38:02.322520+00:00",
+  "task_folder": "CD_vs_UC",
+  "task": "UC vs CD",
+  "class_order": [
+    "CD",
+    "UC"
+  ],
+  "repeat": 1,
+  "expected_folds": 5,
+  "paths": {
+    "pd_dir": "/home/Jack/Real_Data/out_pds",
+    "label_csv": "/home/Jack/Real_Data/sample_labels.csv",
+    "metadata_csv": "/home/Jack/Real_Data/hmp2_metadata.csv",
+    "split_manifest": "/home/Jack/Real_Data/H0_Ricci_JointSparse_RepeatedCV_AllTasks/splits/CD_vs_UC_split_manifest.csv",
+    "output_dir": "/home/Jack/Real_Data/H0_AlphaPi_1x5_AllTasks"
+  },
+  "selection": {
+    "percentile_steps": [
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7
+    ],
+    "inner_splits": 5,
+    "inner_split_attempts": 256,
+    "inner_split_policy": "first all-class StratifiedGroupKFold split across a deterministic seed sequence",
+    "epoch_order": [
+      "validation balanced accuracy",
+      "validation macro F1",
+      "validation ROC-AUC",
+      "lower validation loss",
+      "earlier epoch"
+    ],
+    "candidate_order": [
+      "validation balanced accuracy",
+      "validation macro F1",
+      "validation ROC-AUC",
+      "fewer intervals",
+      "larger q"
+    ],
+    "candidate_seed_policy": "same seed for every q within an outer fold"
+  },
+  "final_refit": {
+    "fresh_initialization": true,
+    "bounds_source": "all outer-training diagrams only",
+    "epochs": "selected validation-best epoch"
+  },
+  "model": {
+    "epochs": 70,
+    "batch_size": 32,
+    "learning_rate": 0.0004,
+    "weight_decay": 0.0001,
+    "quad_points": 5,
+    "point_chunk": 256,
+    "lambda_ce": 1000.0,
+    "lambda_within": 1.0,
+    "lambda_radius": 1.0,
+    "lambda_between": 200.0,
+    "margin_between": 10.0,
+    "max_grad_norm": 0.0
+  },
+  "randomness": {
+    "model_seed": 1337,
+    "inner_split_seed": 7331,
+    "deterministic": true
+  },
+  "fingerprints": {
+    "manifest_canonical_sha256": "4f1ba2c1cac0fe03ed7ff4957c501eaae58cd42deec2a4873ecf303e6c311e8f",
+    "label_csv_sha256": "e9ae8e14afa20e8e3a8a5863daee2ba1cbc70844f514b3cd7d1560fcf9004b18",
+    "metadata_csv_sha256": "656b7bd97660ddb875548805e30bede31f2d1208293f7170d2d5755e33862ec9",
+    "pd_listing_sha256": "d775a0ed16b88b6fffb30b12c7b4837cf072fe57f59783dc7fda93c80f14f251"
+  },
+  "software": {
+    "python": "3.10.12 (main, Mar  3 2026, 11:56:32) [GCC 11.4.0]",
+    "platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.35",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "torch": "2.9.1+cpu",
+    "sklearn": "1.7.2",
+    "device": "cpu"
+  }
+}

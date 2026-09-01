@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+*.log
+*.tmp
+.DS_Store
+outputs/
+runs/
+aggregate/
+preflight/
+splits/
+RUN_COMPLETE.json
+progress.json
+progress_by_task.csv
