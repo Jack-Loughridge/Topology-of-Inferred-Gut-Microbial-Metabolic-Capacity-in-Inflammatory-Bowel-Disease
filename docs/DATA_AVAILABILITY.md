@@ -66,14 +66,16 @@ The final tagged GitHub release will be archived in a DOI-issuing repository suc
 
 The archive DOI is intentionally left unset until the final result freeze.
 
+## Canonicalisation provenance
+
+The transformations producing `Real_Species_Abundances_canon.xlsx` and `AGORA_reactions_canon.parquet` have been recovered through privacy-preserving audits and encoded in `pipeline/graph_construction/canonicalize_graph_inputs.py`. Exact input and historical output hashes, selection and aggregation rules, production dimensions, and the audit chain are recorded in `provenance/CANONICALIZATION.md`. No sample identifiers or sample-level abundance values are stored in Git.
+
 ## Outstanding release blockers
 
-The following provenance gaps must be resolved before release:
+The following provenance items must still be resolved before release:
 
-1. document and encode the exact transformation from `Real_Species_Abundances.xlsx` to `Real_Species_Abundances_canon.xlsx`;
-2. document and encode the exact transformation from `AGORA_reactions.parquet` to `AGORA_reactions_canon.parquet`;
-3. pin and hash the exact public input files and AGORA2 distribution;
-4. create the final derived-results manifest and permanent DOI.
+1. pin and hash the exact public IBDMDB input files and AGORA2 distribution;
+2. create the final derived-results manifest and permanent DOI.
 
 ## Provisional manuscript Data Availability Statement
 

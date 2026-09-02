@@ -10,7 +10,7 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 
 | Component | Location | Purpose |
 |---|---|---|
-| Graph construction | `pipeline/graph_construction/` | Extract and sanitise AGORA2 reactions and build sample-specific weighted directed graphs. |
+| Graph construction | `pipeline/graph_construction/` | Extract and sanitise AGORA2 reactions, reproduce canonical graph inputs, and build sample-specific weighted directed graphs. |
 | Topological features | `pipeline/topology/` | Construct H0 persistence diagrams and faithful active-edge Ricci curvature features. |
 | Standalone H0 analyses | `analysis/h0_alpha_pi/` | Train-only adaptive H0 Alpha-Pi classification and sensitivity analyses. |
 | Standalone Ricci analyses | `analysis/ricci/` | Repeated participant-grouped Ricci classification and C-path analyses. |
@@ -72,7 +72,8 @@ Start with:
 - [`docs/DATA_AVAILABILITY.md`](docs/DATA_AVAILABILITY.md) for public sources, redistribution boundaries, and the planned permanent archive;
 - [`docs/COMPUTATIONAL_REQUIREMENTS.md`](docs/COMPUTATIONAL_REQUIREMENTS.md) for environments and resource classes;
 - [`docs/MANUSCRIPT_CODE_MAP.md`](docs/MANUSCRIPT_CODE_MAP.md) for analysis-to-code traceability;
-- [`environment/README.md`](environment/README.md) for installation and environment provenance.
+- [`environment/README.md`](environment/README.md) for installation and environment provenance;
+- [`pipeline/graph_construction/README.md`](pipeline/graph_construction/README.md) for the audited graph-input canonicalisation commands.
 
 Production source files and locked configurations can also be checked directly with:
 

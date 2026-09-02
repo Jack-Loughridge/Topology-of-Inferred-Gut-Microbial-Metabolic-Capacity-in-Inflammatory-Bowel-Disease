@@ -7,6 +7,7 @@ This document maps each scientific claim, table, and figure to its canonical cod
 | Manuscript role | Canonical code | Required input | Principal output | Runtime |
 |---|---|---|---|---|
 | AGORA2 reaction extraction and sanitisation | `pipeline/graph_construction/sanitize_agora_sbml.py`; `extract_agora_reactions.py` | AGORA2 SBML files | extracted reaction table | Heavy preprocessing |
+| Canonical graph-input construction | `pipeline/graph_construction/canonicalize_graph_inputs.py` | audited species-abundance workbook and extracted AGORA2 reaction table | canonical species and reaction tables with provenance JSON | Moderate species / heavy streamed reactions |
 | Sample metabolic graph construction | `pipeline/graph_construction/build_microbiome_graphs.py` | canonical reactions and species abundances | sample weighted directed graphs and baselines | Heavy CPU/storage |
 | H0 persistence representation | `pipeline/topology/build_persistence_diagrams.py` | sample graphs | per-sample H0 diagrams | Heavy CPU |
 | Faithful Ricci representation | `pipeline/topology/compute_ricci_faithful_pairwise_active.py` | active sample graphs | per-edge Ricci tables | Very heavy CPU |

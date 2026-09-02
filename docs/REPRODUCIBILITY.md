@@ -65,7 +65,7 @@ pipeline/graph_construction/extract_agora_reactions.py
 pipeline/graph_construction/build_microbiome_graphs.py
 ```
 
-The two canonicalisation transformations identified in `provenance/IMPORT_NOTES.md` remain release blockers. Full reconstruction is not considered closed until executable steps replace those undocumented transformations.
+The previously undocumented graph-input transformations are now encoded in `pipeline/graph_construction/canonicalize_graph_inputs.py`. The species and reaction operations verify the audited production input hashes and expected dimensions when invoked with `--require-production-hash`; exact rules, reference hashes, commands, and the privacy-preserving audit chain are recorded in `pipeline/graph_construction/README.md` and `provenance/CANONICALIZATION.md`.
 
 ### 3. Derive topological representations
 
@@ -143,7 +143,6 @@ The final release must record the exact command and source output for every manu
 ## Items still required before release
 
 - a fully resolved environment lock and clean-install report;
-- executable canonicalisation steps for the two provenance gaps;
 - final result and figure-source tables;
 - a clean-clone analysis replay using the release archive;
 - a tagged release and permanent DOI.

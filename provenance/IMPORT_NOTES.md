@@ -9,8 +9,6 @@ Manifest SHA-256: bc137b4996a1d40bd6ae466a41e40a61f2143bbe11ab0dbbf3961bd4bebb65
 Generated results, datasets, model artifacts, caches, nested Git metadata and historical backup copies were excluded.
 The excluded historical copies remain recoverable under ~/publication_repo_excluded_20260901.
 
-Outstanding provenance gaps before release:
-1. Real_Species_Abundances.xlsx to Real_Species_Abundances_canon.xlsx.
-2. AGORA_reactions.parquet to AGORA_reactions_canon.parquet.
+The two graph-input canonicalisation gaps identified during import were resolved by privacy-preserving audits on 2026-09-02. The recovered transformations, audited hashes, executable implementation, and regression tests are documented in `provenance/CANONICALIZATION.md` and `pipeline/graph_construction/README.md`.
 
-Final result tables and hashes will be added after the active computations finish.
+Remaining release provenance includes exact public-input and AGORA2 distribution pins, final result tables and hashes, clean replay evidence, and permanent archive identifiers.

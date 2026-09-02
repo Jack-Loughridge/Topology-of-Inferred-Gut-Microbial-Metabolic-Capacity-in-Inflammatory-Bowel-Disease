@@ -24,6 +24,7 @@ CANONICAL_SOURCE_ROOTS = (
 )
 
 UNIT_SUITES = (
+    ("graph-input canonicalization unit tests", ROOT / "pipeline/graph_construction", ("-m", "pytest", "-q", "tests")),
     ("H0 Alpha-Pi five-task unit tests", ROOT / "analysis/h0_alpha_pi/five_task_1x5", ("-m", "pytest", "-q", "tests")),
     ("joint H0-Ricci core unit tests", ROOT / "analysis/joint/core", ("-m", "pytest", "-q", "tests")),
     ("joint repeated-CV unit tests", ROOT / "analysis/joint/repeated_cv", ("-m", "pytest", "-q", "tests")),
