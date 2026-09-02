@@ -1,6 +1,14 @@
 name: Full synthetic reproducibility checks
 
 on:
+  # Bootstrap validation while this workflow exists only on the publication
+  # branch. This runs only when this workflow file itself changes on that branch.
+  push:
+    branches:
+      - publication/rebuild-2026
+    paths:
+      - .github/workflows/full-synthetic.yml
+  # Becomes available for ordinary manual runs after the workflow reaches main.
   workflow_dispatch:
 
 permissions:
