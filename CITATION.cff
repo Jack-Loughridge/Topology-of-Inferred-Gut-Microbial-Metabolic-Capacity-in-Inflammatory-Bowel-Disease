@@ -1,10 +1,16 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite the associated manuscript."
-title: "Species-abundance benchmarks for all five IBDMDB tasks"
+message: "Please cite the associated manuscript and archived software release."
+title: "Topology of Inferred Gut Microbial Metabolic Capacity in Inflammatory Bowel Disease"
 type: software
 authors:
   - family-names: Loughridge
     given-names: Jack
-version: 2.0.0
-date-released: 2026-07-21
+repository-code: "https://github.com/Jack-Loughridge/Topology-of-Inferred-Gut-Microbial-Metabolic-Capacity-in-Inflammatory-Bowel-Disease"
 license: MIT
+keywords:
+  - inflammatory bowel disease
+  - microbiome
+  - topological data analysis
+  - persistent homology
+  - Ricci curvature
+  - metabolic networks
