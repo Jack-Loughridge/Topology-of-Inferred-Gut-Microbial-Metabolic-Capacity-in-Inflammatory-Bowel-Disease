@@ -4,11 +4,33 @@
 
 This repository supports three levels of reproduction:
 
-1. **Portable verification:** run unit and synthetic integration tests without human microbiome data.
+1. **Portable verification:** run integrity, unit, and synthetic integration tests without human microbiome data.
 2. **Analysis replay:** reproduce classifiers and manuscript tables from released derived diagrams, feature matrices, split manifests, and metadata.
 3. **Full reconstruction:** begin with public cohort products or raw sequence data and AGORA2 SBML files, then rebuild graphs, topology, models, and manuscript outputs.
 
 The final release must support levels 1 and 2 directly. Level 3 is computationally expensive and depends on separately distributed third-party resources, but every author-generated transformation must be documented and available.
+
+## Portable verification
+
+The repository has one root entry point with three cumulative levels:
+
+```bash
+python run_checks.py static
+python run_checks.py unit
+python run_checks.py full
+```
+
+- `static` verifies the production source manifest, citation and environment metadata, locked JSON configurations, canonical Python and Bash syntax, and tracked-file hygiene.
+- `unit` also executes the H0 Alpha-Pi and joint H0-Ricci pytest suites.
+- `full` also executes all six data-free synthetic component self-tests for H0, joint, Ricci, and species analyses.
+
+For static checks alone, install PyYAML into Python 3.10 or later. For unit or full checks, create the modern environment described in `environment/README.md` and validate it first:
+
+```bash
+python environment/validate_analysis_environment.py
+```
+
+The root `.github/workflows/ci.yml` workflow runs static and unit verification on pushes and pull requests. `.github/workflows/full-synthetic.yml` exposes the longer full suite through a manual workflow dispatch. Both workflows use CPU-only PyTorch and constrain numerical-library threads.
 
 ## Integrity first
 
@@ -120,8 +142,7 @@ The final release must record the exact command and source output for every manu
 
 ## Items still required before release
 
-- a top-level environment lock and clean-install procedure;
-- a root-level lightweight CI workflow;
+- a fully resolved environment lock and clean-install report;
 - executable canonicalisation steps for the two provenance gaps;
 - final result and figure-source tables;
 - a clean-clone analysis replay using the release archive;

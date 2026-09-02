@@ -18,6 +18,7 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 | Species benchmarks | `analysis/species/` | L1 logistic regression, random forest, and XGBoost comparators on species abundances. |
 | Interpretation | `analysis/interpretation/` | Generate coefficient, contribution, process, and manuscript-facing interpretation tables. |
 | External validation | `external_validation/serrano_gomez/` | Process the independent cohort and evaluate frozen-support and expanded-community representations. |
+| Environments | `environment/` | Modern analysis, current external-profiling, and historical MetaPhlAn2 environment records. |
 | Provenance | `provenance/` | Source checksums, locked production configurations, and import notes. |
 | Publication results | `results/` | Compact result and figure-source tables added at the final result freeze. |
 
@@ -40,6 +41,29 @@ The external study has two deliberately distinct representations:
 - **v1 frozen support:** projects external samples into the structural representation and feature order learned from IBDMDB, without external-cohort refitting;
 - **v2 expanded community:** rebuilds an external-normalised expanded-community structural representation and is interpreted as structural replication or exploratory transfer, not as the same frozen predictor.
 
+## Quick verification
+
+The static checks require Python 3.10 or later and PyYAML, but no microbiome data:
+
+```bash
+python -m pip install PyYAML
+python run_checks.py static
+```
+
+After installing the modern analysis environment, run the existing scientific unit suites through the root entry point:
+
+```bash
+python run_checks.py unit
+```
+
+The complete synthetic end-to-end suite is more computationally intensive:
+
+```bash
+python run_checks.py full
+```
+
+`static` verifies the 191-file production source manifest, citation and environment metadata, locked JSON configurations, Python and Bash syntax, and tracked-file hygiene. `unit` additionally runs the H0 and joint-model pytest suites. `full` additionally runs all six data-free synthetic component self-tests. GitHub Actions runs the static and unit levels on pushes and pull requests; the full suite is available as a manually triggered workflow.
+
 ## Reproducibility
 
 Start with:
@@ -47,9 +71,10 @@ Start with:
 - [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) for the ordered workflow and reproduction levels;
 - [`docs/DATA_AVAILABILITY.md`](docs/DATA_AVAILABILITY.md) for public sources, redistribution boundaries, and the planned permanent archive;
 - [`docs/COMPUTATIONAL_REQUIREMENTS.md`](docs/COMPUTATIONAL_REQUIREMENTS.md) for environments and resource classes;
-- [`docs/MANUSCRIPT_CODE_MAP.md`](docs/MANUSCRIPT_CODE_MAP.md) for analysis-to-code traceability.
+- [`docs/MANUSCRIPT_CODE_MAP.md`](docs/MANUSCRIPT_CODE_MAP.md) for analysis-to-code traceability;
+- [`environment/README.md`](environment/README.md) for installation and environment provenance.
 
-Production source files and locked configurations can be checked with:
+Production source files and locked configurations can also be checked directly with:
 
 ```bash
 sha256sum -c provenance/source_import_manifest.sha256
