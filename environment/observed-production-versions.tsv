@@ -1,0 +1,16 @@
+package	observed_version	context
+Python	3.10.12	Azure production system interpreter
+NumPy	2.2.6	Modern analysis environment
+pandas	2.3.3	Modern analysis environment
+SciPy	1.15.3	Modern analysis environment
+scikit-learn	1.7.2	Modern analysis environment
+PyTorch	2.9.1+cpu	Modern analysis environment
+NetworkX	3.4.2	Modern analysis environment
+XGBoost	3.2.0	Modern analysis environment
+PyArrow	22.0.0	Modern analysis environment
+Matplotlib	3.10.8	Modern analysis environment
+openpyxl	3.1.5	Modern analysis environment
+fastparquet	2024.11.0	Modern analysis environment
+tqdm	4.67.1	Modern analysis environment
+PyYAML	5.4.1	Modern analysis environment
+pytest	NOT_INSTALLED	Will be supplied by portable test environment
