@@ -1,0 +1,117 @@
+{
+  "analysis": "frozen IBDMDB species benchmarks trained after last-occurrence duplicate resolution on all external-v2 samples and the paired v1 subset",
+  "benchmark_artifact_layout": "legacy_ibd_complete_case_v1_1",
+  "benchmark_duplicate_policy": "last workbook occurrence per bare External ID",
+  "cohort": {
+    "paired_ids_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/expanded_community_structural_replication_v2/01_curated/paired_v1_sample_ids.csv",
+    "paired_ids_sha256": "7a1117fccb384df2b672401a680a730b4dab05891aaa7f140cbfa2196e6e66db",
+    "profile_manifest_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/expanded_community_structural_replication_v2/01_curated/profile_manifest.csv",
+    "profile_manifest_sha256": "e8521d19766c2da68fbb3cbfa5d33ced13fdc48553c4dc5334983f432577c3fb"
+  },
+  "completed_utc": "2026-09-03T09:21:19.933211+00:00",
+  "environment": {
+    "joblib": "1.5.3",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.35",
+    "python": "3.10.12 (main, Mar  3 2026, 11:56:32) [GCC 11.4.0]",
+    "sklearn": "1.7.2"
+  },
+  "frozen_preprocessor": {
+    "input_species_coordinates": 508,
+    "pseudocount": 1e-06,
+    "variance_selected_coordinates": 508,
+    "variance_threshold": 1e-10
+  },
+  "metadata": {
+    "label_column": "external_label_ibd_binary",
+    "metadata_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/expanded_community_structural_replication_v2/01_curated/matched_external_metadata_184.tsv.gz",
+    "metadata_sha256": "79f8a624b13fbaa949d3f6cb7660d093b2f3b848442f4d54232810ba42dd5774",
+    "participant_columns_considered_in_order": [
+      "host_subject_id",
+      "patient_id",
+      "subject_id"
+    ],
+    "sample_id_column": "sample_id_v2"
+  },
+  "method": {
+    "evaluation_sets": {
+      "all_external_v2_samples": 184,
+      "paired_with_structural_v1": 90
+    },
+    "external_calibration": false,
+    "external_feature_selection": false,
+    "external_rescaling": false,
+    "input_representation": "original frozen 508 IBDMDB species-abundance coordinates",
+    "label_firewall": "all 552 sample probabilities were computed before matched external metadata or labels were read",
+    "model_refitting": false,
+    "threshold": 0.5,
+    "threshold_selection_on_external_data": false
+  },
+  "minimum_mapped_fraction_required": 0.0,
+  "models": {
+    "logistic_l1": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/logistic_l1/full_source_model.joblib",
+      "artifact_sha256": "e95e59b49e9246c7a81f290e427f186649a422975c4d55ff97effd1cad9a1b06",
+      "label": "Species L1 logistic",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/logistic_l1/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "14bcd14074f1613975427d9ea497de7bb7882bbd8f5777514f338a969a13c560"
+    },
+    "random_forest": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/random_forest/full_source_model.joblib",
+      "artifact_sha256": "4e4d66f95883fca332bf7cf48b20b78c0040b34c504c2fb3b3fedcb611732cb5",
+      "label": "Species random forest",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/random_forest/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "3a1b112e888d4ad289cdcf3d30e352792bc3ca1d4c5c0995100fedb185f3609d"
+    },
+    "xgboost": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/xgboost/full_source_model.joblib",
+      "artifact_sha256": "ede49edfbe7de238685de5bf598648295a8639a39e48d7aba0a24f8aaf4bb714",
+      "label": "Species XGBoost",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/xgboost/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "76a1ffff966b07a5c8606cef0cffa4e79f7238b41f8c45d94c75ca63d99e0108"
+    }
+  },
+  "paired_v1_probability_crosscheck": {
+    "max_abs_difference_by_model": {
+      "logistic_l1": 1.1102230246251565e-16,
+      "random_forest": 1.1102230246251565e-16,
+      "xgboost": 1.1102230246251565e-16
+    },
+    "max_abs_difference_overall": 1.1102230246251565e-16,
+    "path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/structural_frozen_ibdmdb/external_species_benchmarks_ibd_vs_nonibd_last_occurrence_v1/sample_predictions_all_models.csv",
+    "rows_compared": 270,
+    "sha256": "35f8832a9c09afe22aee3489179d3f3282bacd94c00e3750f68667982a140e01",
+    "status": "pass",
+    "tolerance": 1e-12
+  },
+  "script_path": "REPOSITORY_ROOT/external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_v2_last_occurrence_all184.py",
+  "script_sha256": "a99e158c76511ab222114d61dd86b627fb2bf947fa31bb92cfa9c6e3e1463415",
+  "script_version": "1.1.0",
+  "source_abundance_scale": {
+    "external_abundance_multiplier": 1.0,
+    "scale_rule": "source rows are percentage-scale; retain external abundance_percent",
+    "source_row_sum_max": 200.0,
+    "source_row_sum_median": 101.74383,
+    "source_row_sum_min": 99.99996999999999
+  },
+  "structural_mapper_axis_audit": {
+    "exact_order_match_to_benchmark": true,
+    "n_species": 508,
+    "training_scale_statistics": {
+      "n_samples": 1360,
+      "n_species": 508,
+      "row_sum_max": 200.0,
+      "row_sum_median": 101.71129499999998,
+      "row_sum_min": 0.0,
+      "row_sum_q05": 100.00000000000001,
+      "row_sum_q95": 114.52445999999999
+    },
+    "training_species_path": "DATA_ROOT/Real_Species_Abundances_canon.xlsx",
+    "training_species_sha256": "087a5bd0dd001906b348fdedd433d911edad73fef3bde5af47ca0a0fef5cee69"
+  },
+  "v1_deployment_source": {
+    "path": "REPOSITORY_ROOT/external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_ibd_last_occurrence_v1.py",
+    "sha256": "9424055ecef397aafc14a695b33018bc84d7e737c74c34a006c8f43f1a308e24"
+  }
+}

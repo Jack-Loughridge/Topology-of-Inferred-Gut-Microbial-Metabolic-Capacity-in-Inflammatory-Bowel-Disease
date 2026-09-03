@@ -1,0 +1,74 @@
+{
+  "metric_differences_v2_minus_v1": {
+    "accuracy": 0.18888888888888888,
+    "average_precision_ibd": 0.11304642187928526,
+    "balanced_accuracy": 0.25,
+    "brier": -0.0234498144215346,
+    "log_loss": -0.045565097898225604,
+    "macro_f1": 0.1726589352629539,
+    "roc_auc": 0.27243589743589747
+  },
+  "n": 90,
+  "prediction_agreement_fraction": 0.5222222222222223,
+  "probability_difference_v2_minus_v1": {
+    "max": 0.3740189820528031,
+    "mean": 0.010822203490469199,
+    "mean_absolute": 0.12606716063287524,
+    "median": 0.006248895823955519,
+    "min": -0.27667740285396575
+  },
+  "v1_metrics_on_paired_samples": {
+    "accuracy": 0.26666666666666666,
+    "average_precision_ibd": 0.8198162311652839,
+    "balanced_accuracy": 0.40064102564102566,
+    "brier": 0.310079796479871,
+    "class_counts": {
+      "IBD": 78,
+      "nonIBD": 12
+    },
+    "confusion_matrix": [
+      [
+        7,
+        5
+      ],
+      [
+        61,
+        17
+      ]
+    ],
+    "log_loss": 0.8183171266314746,
+    "macro_f1": 0.2575,
+    "n": 90,
+    "recall_IBD": 0.21794871794871795,
+    "recall_nonIBD": 0.5833333333333334,
+    "roc_auc": 0.35256410256410253,
+    "threshold": 0.5
+  },
+  "v2_metrics_on_same_paired_samples": {
+    "accuracy": 0.45555555555555555,
+    "average_precision_ibd": 0.9328626530445692,
+    "balanced_accuracy": 0.6506410256410257,
+    "brier": 0.2866299820583364,
+    "class_counts": {
+      "IBD": 78,
+      "nonIBD": 12
+    },
+    "confusion_matrix": [
+      [
+        11,
+        1
+      ],
+      [
+        48,
+        30
+      ]
+    ],
+    "log_loss": 0.772752028733249,
+    "macro_f1": 0.4301589352629539,
+    "n": 90,
+    "recall_IBD": 0.38461538461538464,
+    "recall_nonIBD": 0.9166666666666666,
+    "roc_auc": 0.625,
+    "threshold": 0.5
+  }
+}
