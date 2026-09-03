@@ -4,7 +4,11 @@ This repository contains the code and reproducibility materials for constructing
 
 The workflow combines microbial species profiles with genome-scale metabolic reconstructions, constructs sample-specific directed graphs, derives H0 persistence and faithful active-edge Ricci curvature representations, evaluates topology-based classifiers against species-abundance benchmarks, and performs external validation in an independent shotgun-metagenomic cohort.
 
-> **Release status:** publication-preparation branch. Production source code is hash locked. Final result tables, immutable archive identifiers, and the preferred manuscript citation will be added after the remaining computations and release audit are complete.
+> **Release status:** publication-preparation branch. Production source code,
+> external-validation aggregate results, public-input provenance, and reference
+> database hashes are recorded. The remaining internal Ricci summaries,
+> immutable archive identifier, and preferred manuscript citation will be added
+> at the final result freeze.
 
 ## Study components
 
@@ -72,6 +76,7 @@ Start with:
 - [`docs/DATA_AVAILABILITY.md`](docs/DATA_AVAILABILITY.md) for public sources, redistribution boundaries, and the planned permanent archive;
 - [`docs/COMPUTATIONAL_REQUIREMENTS.md`](docs/COMPUTATIONAL_REQUIREMENTS.md) for environments and resource classes;
 - [`docs/MANUSCRIPT_CODE_MAP.md`](docs/MANUSCRIPT_CODE_MAP.md) for analysis-to-code traceability;
+- [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) for the remaining freeze and archival gates;
 - [`environment/README.md`](environment/README.md) for installation and environment provenance;
 - [`pipeline/graph_construction/README.md`](pipeline/graph_construction/README.md) for the audited graph-input canonicalisation commands.
 
@@ -85,7 +90,7 @@ The source manifest records 191 files imported from the production Azure VM sour
 
 ## Data and code availability
 
-The source cohort is the public IBDMDB/HMP2 study (BioProject `PRJNA398089`). The external Serrano-Gomez processing scripts use ENA study `PRJEB42155`. AGORA2 reconstructions are obtained separately from the Virtual Metabolic Human resource and remain subject to their original distribution terms.
+The source cohort is the public IBDMDB/HMP2 study (BioProject `PRJNA398089`). The external Serrano-Gomez processing scripts use ENA study `PRJEB42155`. The graph pipeline uses AGORA2 version 2.01, obtained separately from the Virtual Metabolic Human resource and subject to its original distribution terms. Exact public-product and production-input hashes are recorded in `provenance/INPUT_PROVENANCE.md`.
 
 Raw sequence data and large intermediate matrices are not redistributed in this Git repository. The final release will link a permanent archive containing the compact derived materials needed to verify every reported table and figure, together with a checksum manifest.
 

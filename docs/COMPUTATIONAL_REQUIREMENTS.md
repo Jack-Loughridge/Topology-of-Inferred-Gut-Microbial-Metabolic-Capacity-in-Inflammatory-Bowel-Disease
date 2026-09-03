@@ -8,6 +8,10 @@ The source freeze was collected on 1 September 2026 from an Azure x86-64 Linux V
 Operating system: Ubuntu 22.04 family
 Kernel:           Linux 6.8.0-1052-azure
 Python:           3.10.12
+Processor:        Intel Xeon Platinum 8272CL at 2.60 GHz
+Logical CPUs:     4
+Memory:           15 GiB RAM and 23 GiB swap
+Filesystem:       248 GiB root volume
 ```
 
 The full recorded environment is retained in the Phase 0 audit archive. The principal observed Python packages were:
@@ -51,7 +55,13 @@ The audited current external environment contains a recorded anomaly: the DIAMON
 | Heavy model fitting | Repeated H0 Alpha-Pi and nested joint H0-Ricci analyses | Long-running VM workload; GPU may accelerate PyTorch stages but is not assumed by the source freeze. |
 | Storage intensive | Raw FASTQ processing and complete generated graph/feature collections | External storage required; not suitable for GitHub. |
 
-Exact peak memory, disk usage, CPU model, core count, and wall-clock timings remain to be recorded from the completed production runs before release.
+The Phase 6A audit recorded 216 GiB used and 33 GiB available on the 248 GiB
+root volume while the final Ricci runs were active. CPU model, logical CPU
+count, memory, swap, and filesystem capacity are therefore fixed provenance.
+Per-stage peak memory and exact wall-clock timing were not instrumented in the
+historical production runs and must not be inferred retrospectively. Runtime
+classes and completion-marker timestamps provide the available operational
+record.
 
 ## Portable checks
 
@@ -91,8 +101,7 @@ The root test runner applies the same constraints. Thread counts are operational
 The repository now contains direct modern and external environment specifications, an observed production-version record, and automated portable checks. Before release it still requires:
 
 - a fully resolved Linux dependency lock generated and verified from a clean environment;
-- completed database and executable checksum manifests for both external preprocessing paths;
 - clean-run test logs and representative analysis replay evidence;
-- final CPU, memory, storage, and wall-clock measurements for the heavy production stages.
+- final all-results manifest, release tag, and archive DOI.
 
 A clean environment must execute the root unit suite and the full synthetic workflow before `v1.0.0` is tagged.

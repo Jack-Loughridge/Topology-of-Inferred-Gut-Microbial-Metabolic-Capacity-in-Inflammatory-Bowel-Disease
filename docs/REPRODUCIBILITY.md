@@ -48,12 +48,12 @@ Do not modify hash-locked production sources when improving documentation, wrapp
 
 ### 1. Acquire and verify inputs
 
-- Obtain the selected IBDMDB/HMP2 products associated with BioProject `PRJNA398089`.
-- Obtain the exact AGORA2 SBML distribution recorded by the final release.
+- Obtain the exact IBDMDB/HMP2 metadata and taxonomic-profile products recorded in `provenance/INPUT_PROVENANCE.md`.
+- Obtain the AGORA2 version 2.01 SBML distribution from the Virtual Metabolic Human resource.
 - For external validation, construct the selected `PRJEB42155` manifest and verify downloaded FASTQ MD5 values.
 - Confirm all filenames and hashes against the release input manifest.
 
-The final acquisition commands and checksums will be recorded in `docs/DATA_AVAILABILITY.md` and the permanent archive.
+Verified public URLs, local basenames, sizes, and hashes are recorded in `provenance/input_file_inventory.tsv`. The historical AGORA2 archive checksum and acquisition date were not retained; the resulting reaction tables are hash pinned and the limitation is explicit in `provenance/INPUT_PROVENANCE.md`.
 
 ### 2. Construct the metabolic reaction table and graphs
 
@@ -118,6 +118,11 @@ Maintain the distinction between:
 
 External labels must not influence graph construction, scaling, feature vocabulary, parameter selection, or model fitting. Cohort labels are used only for the prespecified final evaluation and labelled summaries.
 
+Corrected publication-stage deployment entry points and their relationship to
+the historical source snapshot are recorded in
+`provenance/PUBLICATION_CORRECTIONS.md`. Canonical aggregate external tables and
+machine-readable figure-source data are under `results/`.
+
 ### 7. Generate manuscript-facing outputs
 
 Canonical interpretation scripts are under:
@@ -143,6 +148,6 @@ The final release must record the exact command and source output for every manu
 ## Items still required before release
 
 - a fully resolved environment lock and clean-install report;
-- final result and figure-source tables;
+- the remaining completed internal Ricci result and figure-source tables;
 - a clean-clone analysis replay using the release archive;
 - a tagged release and permanent DOI.

@@ -12,7 +12,12 @@ The source cohort is the Inflammatory Bowel Disease Multi'omics Database / integ
 - NCBI BioProject: `PRJNA398089`
 - Study publication: Lloyd-Price et al., *Nature* (2019), DOI `10.1038/s41586-019-1237-9`
 
-The Git repository does not redistribute raw human sequence data or the complete source metadata tables. The final release must state precisely which public IBDMDB products were downloaded, their download date or release identifier, and the checksums of the files entering the pipeline.
+The Git repository does not redistribute raw human sequence data or the complete source metadata tables. The production inputs were traced to these exact public products:
+
+- metadata: `hmp2_metadata_2018-08-20.csv`, SHA-256 `656b7bd97660ddb875548805e30bede31f2d1208293f7170d2d5755e33862ec9`;
+- taxonomic profiles: `taxonomic_profiles_3.tsv.gz` from the HMP2/MGX 2018-05-04 product directory, SHA-256 `d790ff15e46d61ca0cadc55d9f918de4e3415d7f97c992ac37610aaee02117ed`.
+
+Direct URLs, the derived-input hashes, and the privacy-preserving source-match evidence are recorded in `provenance/INPUT_PROVENANCE.md` and `provenance/input_file_inventory.tsv`.
 
 ## External validation cohort
 
@@ -29,12 +34,12 @@ The final derived-data archive must include the exact selected-run manifest, sam
 
 The graph-construction pipeline uses AGORA2 genome-scale microbial metabolic reconstructions obtained separately from the Virtual Metabolic Human resource.
 
-- Resource: <https://www.vmh.life/>
+- Resource: AGORA2 version 2.01, <https://vmh.life/files/reconstructions/AGORA2/version2.01/>
 - AGORA2 description: Heinken et al., *Nature Biotechnology* (2023), DOI `10.1038/s41587-022-01628-0`
 - Reaction extraction: `pipeline/graph_construction/extract_agora_reactions.py`
 - SBML sanitisation: `pipeline/graph_construction/sanitize_agora_sbml.py`
 
-AGORA2 files are not redistributed here. Before release, the exact AGORA2 version, downloaded archive name, acquisition date, archive checksum, and applicable terms must be recorded.
+AGORA2 files are not redistributed here. The historical raw archive and its acquisition date were not retained, so an archive-level checksum cannot be reconstructed. This is recorded transparently in `provenance/INPUT_PROVENANCE.md`. The exact reaction tables entering graph construction are pinned by SHA-256, and all author-generated extraction, sanitisation, and canonicalisation code is included.
 
 ## Derived files excluded from Git
 
@@ -74,11 +79,11 @@ The transformations producing `Real_Species_Abundances_canon.xlsx` and `AGORA_re
 
 The following provenance items must still be resolved before release:
 
-1. pin and hash the exact public IBDMDB input files and AGORA2 distribution;
-2. create the final derived-results manifest and permanent DOI.
+1. add the remaining completed internal Ricci summaries and their manuscript-facing tables;
+2. create the final all-results manifest, tagged release, and permanent DOI.
 
 ## Provisional manuscript Data Availability Statement
 
-> All author-generated code supporting this study is available in the project GitHub repository and will be archived with a version-specific DOI upon acceptance. The source IBDMDB/HMP2 data are publicly available through the IBDMDB portal and NCBI BioProject PRJNA398089. External-validation sequence data are available through ENA study PRJEB42155. AGORA2 metabolic reconstructions are available from the Virtual Metabolic Human resource under the provider's terms. Compact derived data supporting all reported results, including locked split manifests, out-of-fold predictions, external predictions, summary tables, figure-source data, configurations, and checksums, will be deposited in the permanent release archive; the DOI will be inserted before publication.
+> All author-generated code supporting this study is available in the project GitHub repository and will be archived with a version-specific DOI. The source IBDMDB/HMP2 data are publicly available through the IBDMDB portal and NCBI BioProject PRJNA398089; exact products and SHA-256 checksums are recorded in the repository. External-validation sequence data are available through ENA study PRJEB42155. AGORA2 version 2.01 metabolic reconstructions are available from the Virtual Metabolic Human resource under the provider's terms. Compact derived data supporting the reported results, including locked split manifests, aggregate performance outputs, external evaluation tables, figure-source data, configurations, and checksums, will be deposited in the permanent release archive; the DOI will be inserted before submission or publication, according to the chosen repository workflow.
 
 This statement remains provisional until the archive exists and all source-version fields above are closed.

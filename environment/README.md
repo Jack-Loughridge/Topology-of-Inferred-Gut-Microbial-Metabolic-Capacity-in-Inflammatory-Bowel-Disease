@@ -13,10 +13,10 @@ locks.
 | `requirements-direct.txt` | Pip-compatible direct requirements for the modern environment | Direct specification, not a lock |
 | `observed-production-versions.tsv` | Principal versions observed on the audited Azure production VM | Provenance record, not an install file |
 | `external-profiling-environment.yml` | KneadData, HUMAnN 3, and MetaPhlAn 4 environment used for the current external preprocessing workflow | Conda metadata reconstruction candidate |
-| `metaphlan2_v260_environment.yml` | Runtime scaffold for the separate historical MetaPhlAn 2.6.0 workflow | Incomplete until the historical source and database hashes are finalized |
+| `metaphlan2_v260_environment.yml` | Runtime scaffold for the separate historical MetaPhlAn 2.6.0 workflow | Historical executable and database files hash verified |
 | `validate_analysis_environment.py` | Lightweight import/version validation for the modern environment | Portable verification utility |
 | `provenance/external_profiling_runtime.tsv` | Audited runtime and Conda metadata observations | Production provenance |
-| `provenance/metaphlan2_v260_database_inventory.tsv` | Historical MetaPhlAn database filename and size inventory | SHA-256 values pending final data audit |
+| `provenance/metaphlan2_v260_database_inventory.tsv` | Historical MetaPhlAn database filename, size, and SHA-256 inventory | Verified production provenance |
 
 ## Modern analysis environment
 
@@ -73,11 +73,14 @@ The historical MetaPhlAn2 workflow is scientifically distinct from the HUMAnN
 MetaPhlAn 2.6.0 (19 August 2016) with the `mpa_v20_m200` database. Do not install
 modern `metaphlan` into this scaffold and assume equivalence.
 
-`metaphlan2_v260_environment.yml` supplies only a conservative interpreter and
-Bowtie2 scaffold. Before release, the exact historical script, its licence and
-source URL, the Bowtie2 runtime version, and SHA-256 hashes for all seven
-`mpa_v20_m200` files must be added. Until then, full raw-data reconstruction
-through this historical path remains an explicit release blocker.
+`metaphlan2_v260_environment.yml` supplies a conservative interpreter and
+Bowtie2 scaffold. The audited executable reported MetaPhlAn 2.6.0 (19 August
+2016); its SHA-256 and the hashes of all seven `mpa_v20_m200` database files are
+recorded in `provenance/input_file_inventory.tsv` and
+`environment/provenance/metaphlan2_v260_database_inventory.tsv`. These records
+identify the production runtime; they do not claim that modern package solvers
+can reconstruct the historical environment without archived third-party
+artifacts.
 
 ## Final lock procedure
 
