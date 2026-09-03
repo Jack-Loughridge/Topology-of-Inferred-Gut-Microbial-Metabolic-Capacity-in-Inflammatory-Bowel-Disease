@@ -6,7 +6,9 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 
 > **Release status:** publication-preparation branch. Production source code,
 > external-validation aggregate results, public-input provenance, and reference
-> database hashes are recorded. The remaining internal Ricci summaries,
+> database hashes are recorded. A clean-clone reconstruction of the modern
+> analysis environment and its resolved Linux/Python 3.10 lock are also recorded.
+> The remaining internal Ricci summaries,
 > immutable archive identifier, and preferred manuscript citation will be added
 > at the final result freeze.
 
@@ -78,6 +80,7 @@ Start with:
 - [`docs/MANUSCRIPT_CODE_MAP.md`](docs/MANUSCRIPT_CODE_MAP.md) for analysis-to-code traceability;
 - [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) for the remaining freeze and archival gates;
 - [`environment/README.md`](environment/README.md) for installation and environment provenance;
+- [`environment/locks/requirements-linux-x86_64-py310.lock`](environment/locks/requirements-linux-x86_64-py310.lock) for the clean-tested modern-environment lock;
 - [`pipeline/graph_construction/README.md`](pipeline/graph_construction/README.md) for the audited graph-input canonicalisation commands.
 
 Production source files and locked configurations can also be checked directly with:

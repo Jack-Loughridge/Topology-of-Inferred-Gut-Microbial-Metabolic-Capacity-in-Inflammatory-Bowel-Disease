@@ -23,9 +23,9 @@ items that depend on the two remaining Ricci computations.
 
 ## Independent pre-release gates
 
-- [ ] Create and validate a fully resolved Linux dependency lock from a clean
+- [x] Create and validate a fully resolved Linux dependency lock from a clean
       environment.
-- [ ] Run the complete synthetic workflow on the release candidate.
+- [x] Run the complete synthetic workflow on the release candidate.
 - [ ] Open and review the publication branch pull request; require the
       publication checks before merge.
 - [ ] Add final author metadata, ORCID identifiers if applicable, manuscript

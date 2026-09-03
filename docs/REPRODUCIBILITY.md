@@ -30,6 +30,12 @@ For static checks alone, install PyYAML into Python 3.10 or later. For unit or f
 python environment/validate_analysis_environment.py
 ```
 
+For the clean-tested Linux x86-64/Python 3.10 package set, install
+`environment/locks/requirements-linux-x86_64-py310.lock` using the ordered
+commands in `environment/README.md`. A clean clone at commit
+`06e9b9db738552253e9645d8be9e023d4d96f578` passed the validator, all 46 unit
+tests, and every data-free synthetic component self-test.
+
 The root `.github/workflows/ci.yml` workflow runs static and unit verification on pushes and pull requests. `.github/workflows/full-synthetic.yml` exposes the longer full suite through a manual workflow dispatch. Both workflows use CPU-only PyTorch and constrain numerical-library threads.
 
 ## Integrity first
@@ -147,7 +153,6 @@ The final release must record the exact command and source output for every manu
 
 ## Items still required before release
 
-- a fully resolved environment lock and clean-install report;
 - the remaining completed internal Ricci result and figure-source tables;
 - a clean-clone analysis replay using the release archive;
 - a tagged release and permanent DOI.

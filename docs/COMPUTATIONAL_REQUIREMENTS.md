@@ -31,7 +31,11 @@ The full recorded environment is retained in the Phase 0 audit archive. The prin
 | fastparquet | 2024.11.0 |
 | tqdm | 4.67.1 |
 
-These versions document the audited VM state; they are not the final portable dependency lock. Component `requirements.txt` and `pyproject.toml` files record their direct requirements. Consolidated specifications and provenance are under `environment/`.
+These versions document the audited VM state. Component `requirements.txt` and
+`pyproject.toml` files record their direct requirements. The clean-tested,
+resolved Linux x86-64/Python 3.10 version lock is
+`environment/locks/requirements-linux-x86_64-py310.lock`; consolidated
+specifications and provenance are under `environment/`.
 
 ## Environment separation
 
@@ -75,6 +79,21 @@ python run_checks.py full
 
 Static and unit checks run automatically through GitHub Actions. The longer full synthetic suite is manually triggerable. None of these checks requires human microbiome data.
 
+## Clean-environment reconstruction
+
+On 3 September 2026, a fresh clone of commit
+`06e9b9db738552253e9645d8be9e023d4d96f578` was installed in an isolated
+Python 3.10.12 virtual environment on Linux x86-64. `pip check` reported no
+broken requirements, the environment validator passed, 46 scientific unit
+tests passed, and all six synthetic component self-tests passed. The resolved
+46-package lock has SHA-256
+`6938bab7cffdea4e0e9cd0cbaaf083319001064cf22c4994a82d0e35dcc40bf5`.
+
+The lock records exact package versions but not wheel hashes. It is therefore a
+platform-specific resolved version lock, not a guarantee of byte-identical
+package artifacts. The reconstruction recipe and scope are in
+`environment/provenance/clean_environment_validation_20260903.md`.
+
 ## Thread control
 
 Many launchers deliberately constrain numerical libraries while multiple analyses share the VM:
@@ -94,14 +113,16 @@ The root test runner applies the same constraints. Thread counts are operational
 - Participant boundaries and output membership are verified independently of aggregate metrics.
 - The joint solver performs convergence and KKT checks rather than silently accepting incomplete fits.
 - Floating-point results may vary slightly across BLAS, PyTorch, operating-system, and processor versions; release tests use tolerances while exact membership, shapes, configurations, and hashes remain strict.
-- Full numerical reproduction should use the final locked environment or container once supplied.
+- Portable verification should use the clean-tested lock on Linux x86-64 with
+  Python 3.10. Historical-result comparison must also retain the recorded input,
+  split, configuration, and output hashes.
 
 ## Release deliverables still required
 
-The repository now contains direct modern and external environment specifications, an observed production-version record, and automated portable checks. Before release it still requires:
+The repository now contains direct modern and external environment
+specifications, an observed production-version record, a clean-tested resolved
+modern-environment lock, and automated portable checks. Before release it still
+requires:
 
-- a fully resolved Linux dependency lock generated and verified from a clean environment;
-- clean-run test logs and representative analysis replay evidence;
+- representative analysis replay evidence using the released derived-data archive;
 - final all-results manifest, release tag, and archive DOI.
-
-A clean environment must execute the root unit suite and the full synthetic workflow before `v1.0.0` is tagged.

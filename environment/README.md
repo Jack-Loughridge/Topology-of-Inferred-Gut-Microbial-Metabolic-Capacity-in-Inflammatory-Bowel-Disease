@@ -1,9 +1,10 @@
 # Reproducible software environments
 
 This directory separates the software used for statistical/topological analysis
-from the software used to preprocess the external sequencing cohort. These
-files are direct environment specifications, not fully resolved cross-platform
-locks.
+from the software used to preprocess the external sequencing cohort. The modern
+analysis environment has both portable direct specifications and a clean-tested,
+platform-specific resolved version lock. The external preprocessing files remain
+environment and provenance specifications rather than cross-platform locks.
 
 ## Environment map
 
@@ -11,12 +12,14 @@ locks.
 |---|---|---|
 | `environment.yml` | Modern graph, topology, modelling, interpretation, and test environment | Direct specification; clean-install validation required |
 | `requirements-direct.txt` | Pip-compatible direct requirements for the modern environment | Direct specification, not a lock |
+| `locks/requirements-linux-x86_64-py310.lock` | Complete resolved package versions from the clean modern-environment reconstruction | Validated on Linux x86-64 with Python 3.10 |
 | `observed-production-versions.tsv` | Principal versions observed on the audited Azure production VM | Provenance record, not an install file |
 | `external-profiling-environment.yml` | KneadData, HUMAnN 3, and MetaPhlAn 4 environment used for the current external preprocessing workflow | Conda metadata reconstruction candidate |
 | `metaphlan2_v260_environment.yml` | Runtime scaffold for the separate historical MetaPhlAn 2.6.0 workflow | Historical executable and database files hash verified |
 | `validate_analysis_environment.py` | Lightweight import/version validation for the modern environment | Portable verification utility |
 | `provenance/external_profiling_runtime.tsv` | Audited runtime and Conda metadata observations | Production provenance |
 | `provenance/metaphlan2_v260_database_inventory.tsv` | Historical MetaPhlAn database filename, size, and SHA-256 inventory | Verified production provenance |
+| `provenance/clean_environment_validation_20260903.md` | Clean-clone reconstruction commands, platform, commit, hashes, and test outcome | Passed validation record |
 
 ## Modern analysis environment
 
@@ -35,10 +38,29 @@ python -m pip install -r environment/requirements-direct.txt
 python environment/validate_analysis_environment.py
 ```
 
-The release CI will exercise this environment with synthetic inputs. The
-principal production versions in `observed-production-versions.tsv` document
-the audited VM, but they are not a transitive dependency lock and are not
-guaranteed to be installable together on every platform.
+For the exact clean-tested Linux x86-64/Python 3.10 package set, use a fresh
+virtual environment and install CPU-only PyTorch before the resolved lock:
+
+```bash
+python3.10 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install --index-url https://download.pytorch.org/whl/cpu \
+  'torch==2.14.0+cpu'
+python -m pip install -r \
+  environment/locks/requirements-linux-x86_64-py310.lock
+python -m pip check
+python environment/validate_analysis_environment.py
+python run_checks.py full
+```
+
+This reconstruction passed at commit
+`06e9b9db738552253e9645d8be9e023d4d96f578`. The package set differs from
+several versions observed on the long-lived production VM, so the lock supports
+portable code and synthetic-test verification; it does not retroactively claim
+bitwise identity with every historical production result. Full evidence and
+scope are recorded in
+`provenance/clean_environment_validation_20260903.md`.
 
 ## Current external preprocessing environment
 
@@ -82,16 +104,20 @@ identify the production runtime; they do not claim that modern package solvers
 can reconstruct the historical environment without archived third-party
 artifacts.
 
-## Final lock procedure
+## Lock and release status
 
-Before tagging `v1.0.0`:
+The modern environment completed these gates on 3 September 2026:
 
-1. create each environment from its YAML file on a clean Linux runner;
-2. run the lightweight and synthetic test suite;
-3. replay at least one representative derived-data analysis;
-4. export a fully resolved Linux lock or explicit package specification;
-5. archive the lock, database manifests, commands, and test report;
-6. update documentation with the permanent release and data-archive DOI.
+- fresh Git clone at the recorded commit;
+- isolated Python 3.10 virtual environment;
+- dependency consistency check and environment validator;
+- 46 scientific unit tests and all six data-free synthetic component self-tests;
+- export and SHA-256 verification of the complete resolved version set.
+
+Before tagging `v1.0.0`, replay at least one representative analysis from the
+released derived-data archive and update the documentation with the permanent
+software and data-archive DOI. The external profiling environments must retain
+their separate provenance and database records.
 
 Do not call a direct dependency list or an environment export a complete lock
 unless it contains the full resolved dependency graph and has passed the clean
