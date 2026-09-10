@@ -50,14 +50,28 @@ Two independent defects caused or affected that attempted replacement:
 
 The canonical implementation fixes both defects, uses active vertices only,
 uses raw strength `s = 1 - w`, and performs the manuscript-specified
-sample-to-participant aggregation. The manuscript clustering table must be
-regenerated from this implementation before release. Participant-union and
-participant-mean graph outputs estimate different quantities and must not be
-used as replacements.
+sample-to-participant aggregation. Participant-union and participant-mean graph
+outputs estimate different quantities and must not be used as replacements.
+
+The reviewed production replay completed on 2026-09-10. It matched 1,317
+graphs from 106 participants; 11 graphs had no active edge, leaving 1,306
+valid sample-graph coefficients, and all 106 participants retained at least
+one valid graph. The corrected coefficients match the existing manuscript
+Table 6 values when rounded to three decimal places. The table correction is
+therefore limited to reporting valid/total sample counts and explicitly
+disclosing the empty-graph exclusions.
+
+The aggregate summary SHA-256 is
+`176b3f92fe719a6382b81d4c9b5bcbae751a4b3f8bfd3e47a720d80ca72e3bf1`;
+the LaTeX table SHA-256 is
+`14ebd0cb33e9881f3486cccf4c9fe0cedb605606e622b9b5e2db767af4e6e5e3`;
+and the run-configuration SHA-256 is
+`b1f43dd37cd91c609f1f927f045051bef924824a0ded61cd5594bd54544766ed`.
 
 ## Provenance policy
 
 The original import manifest is retained unchanged because it records the
-source freeze. New canonical diagnostic sources and their final outputs should
-be recorded in the final release/result manifest after the corrected
-clustering run has been reviewed.
+source freeze. The new canonical diagnostic sources and reviewed aggregate
+outputs are separately hash recorded here and in
+`provenance/graph_diagnostics/`; they must also be included in the final
+release/result manifest.

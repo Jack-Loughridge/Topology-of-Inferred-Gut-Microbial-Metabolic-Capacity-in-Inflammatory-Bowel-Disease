@@ -32,8 +32,8 @@ items that depend on the two remaining Ricci computations.
       publication checks before merge.
 - [ ] Add final author metadata, ORCID identifiers if applicable, manuscript
       citation, release version, and release date to `CITATION.cff`.
-- [ ] Run the corrected active-vertex directed-clustering implementation,
-      review valid/total counts, and replace the manuscript clustering table.
+- [x] Run the corrected active-vertex directed-clustering implementation,
+      review valid/total counts, and track the replacement manuscript table.
 
 ## Gates waiting only for the two Ricci computations
 

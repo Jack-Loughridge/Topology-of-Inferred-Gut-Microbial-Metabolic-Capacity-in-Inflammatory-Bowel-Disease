@@ -93,6 +93,13 @@ global maximum normalisation. Valid sample coefficients are averaged within
 participant before condition summaries are formed. Graphs without active edges
 have undefined active-graph clustering and are recorded separately.
 
+The reviewed production replay matched 1,317 graphs from 106 participants.
+Eleven graphs had no active edge, leaving 1,306 valid sample-graph
+coefficients; every participant retained at least one valid graph. The tracked
+aggregate and LaTeX output report valid/total counts explicitly. Their hashes
+and the complete local-output manifest are under
+`provenance/graph_diagnostics/`.
+
 The sequential routing-attack analysis uses deterministic source/target
 sampling and minimax paths. At each cumulative step it removes the edge on the
 current path with the greatest baseline path-use frequency and recomputes a
@@ -170,6 +177,5 @@ The final release must record the exact command and source output for every manu
 ## Items still required before release
 
 - the remaining completed internal Ricci result and figure-source tables;
-- the corrected active-vertex directed-clustering aggregate and LaTeX table;
 - a clean-clone analysis replay using the release archive;
 - a tagged release and permanent DOI.
