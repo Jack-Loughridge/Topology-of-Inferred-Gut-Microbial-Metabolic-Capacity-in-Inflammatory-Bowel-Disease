@@ -17,6 +17,7 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 | Component | Location | Purpose |
 |---|---|---|
 | Graph construction | `pipeline/graph_construction/` | Extract and sanitise AGORA2 reactions, reproduce canonical graph inputs, and build sample-specific weighted directed graphs. |
+| Graph diagnostics | `analysis/graph_diagnostics/` | Compute active-vertex directed clustering and sequential minimax-path edge-removal diagnostics with sample-to-participant aggregation. |
 | Topological features | `pipeline/topology/` | Construct H0 persistence diagrams and faithful active-edge Ricci curvature features. |
 | Standalone H0 analyses | `analysis/h0_alpha_pi/` | Train-only adaptive H0 Alpha-Pi classification and sensitivity analyses. |
 | Standalone Ricci analyses | `analysis/ricci/` | Repeated participant-grouped Ricci classification and C-path analyses. |
@@ -68,7 +69,7 @@ The complete synthetic end-to-end suite is more computationally intensive:
 python run_checks.py full
 ```
 
-`static` verifies the 191-file production source manifest, citation and environment metadata, locked JSON configurations, Python and Bash syntax, and tracked-file hygiene. `unit` additionally runs the H0 and joint-model pytest suites. `full` additionally runs all six data-free synthetic component self-tests. GitHub Actions runs the static and unit levels on pushes and pull requests; the full suite is available as a manually triggered workflow.
+`static` verifies the 191-file production source manifest, citation and environment metadata, locked JSON configurations, Python and Bash syntax, and tracked-file hygiene. `unit` additionally runs graph-diagnostic, H0, and joint-model tests. `full` additionally runs all six data-free synthetic component self-tests. GitHub Actions runs the static and unit levels on pushes and pull requests; the full suite is available as a manually triggered workflow.
 
 ## Reproducibility
 
@@ -82,6 +83,7 @@ Start with:
 - [`environment/README.md`](environment/README.md) for installation and environment provenance;
 - [`environment/locks/requirements-linux-x86_64-py310.lock`](environment/locks/requirements-linux-x86_64-py310.lock) for the clean-tested modern-environment lock;
 - [`pipeline/graph_construction/README.md`](pipeline/graph_construction/README.md) for the audited graph-input canonicalisation commands.
+- [`analysis/graph_diagnostics/README.md`](analysis/graph_diagnostics/README.md) for the corrected clustering and recovered sequential-removal protocols.
 
 Production source files and locked configurations can also be checked directly with:
 

@@ -84,6 +84,22 @@ pipeline/topology/compute_ricci_faithful_pairwise_active.py
 
 The faithful Ricci production configuration uses active edges and records parameters including `epsilon_dist=0.0001`, `c_single_out=0.001`, and `beta=1.4`. Exact run-specific values and source hashes are in `provenance/locked_run_configs/`.
 
+### Graph diagnostics derived directly from sample graphs
+
+Canonical sources are under `analysis/graph_diagnostics/`. Directed clustering
+is computed within each sample on vertices incident to at least one edge with
+`w < 1 - 1e-12`; weighted clustering uses raw support strength `s=1-w` without
+global maximum normalisation. Valid sample coefficients are averaged within
+participant before condition summaries are formed. Graphs without active edges
+have undefined active-graph clustering and are recorded separately.
+
+The sequential routing-attack analysis uses deterministic source/target
+sampling and minimax paths. At each cumulative step it removes the edge on the
+current path with the greatest baseline path-use frequency and recomputes a
+replacement path. The locked configurations, recovery evidence, exclusion
+accounting, and correction rationale are in
+`provenance/GRAPH_DIAGNOSTICS_CORRECTION.md`.
+
 ### 4. Establish locked participant-grouped splits
 
 The repeated joint-analysis preflight constructs and audits task-specific split manifests. Those exact manifests are consumed by the repeated Ricci and species analyses rather than independently regenerating folds.
@@ -154,5 +170,6 @@ The final release must record the exact command and source output for every manu
 ## Items still required before release
 
 - the remaining completed internal Ricci result and figure-source tables;
+- the corrected active-vertex directed-clustering aggregate and LaTeX table;
 - a clean-clone analysis replay using the release archive;
 - a tagged release and permanent DOI.

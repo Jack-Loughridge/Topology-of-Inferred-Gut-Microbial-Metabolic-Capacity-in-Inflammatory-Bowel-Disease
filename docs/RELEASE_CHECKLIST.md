@@ -20,6 +20,8 @@ items that depend on the two remaining Ricci computations.
       and all seven `mpa_v20_m200` database files.
 - [x] Record the production VM CPU, memory, swap, and filesystem capacity.
 - [x] Update GitHub Actions to Node 24-compatible, commit-pinned action releases.
+- [x] Recover the full sequential routing-attack generator, make its GraphML
+      parser self-contained, and track its aggregate source data and LaTeX tables.
 
 ## Independent pre-release gates
 
@@ -30,6 +32,8 @@ items that depend on the two remaining Ricci computations.
       publication checks before merge.
 - [ ] Add final author metadata, ORCID identifiers if applicable, manuscript
       citation, release version, and release date to `CITATION.cff`.
+- [ ] Run the corrected active-vertex directed-clustering implementation,
+      review valid/total counts, and replace the manuscript clustering table.
 
 ## Gates waiting only for the two Ricci computations
 

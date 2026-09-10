@@ -1,0 +1,13 @@
+{
+  "active_edge_rule": "w < 1 - 1e-12",
+  "active_vertices_only": true,
+  "aggregation": "sample graph -> participant average -> condition summary",
+  "duplicate_edge_rule": "retain minimum w / maximum support strength",
+  "expected_participants": 106,
+  "expected_samples": 1317,
+  "graph_dir": "~/Real_Data/out_graphs",
+  "metadata": "~/Real_Data/hmp2_metadata.csv",
+  "output_dir": "~/Real_Data/Directed_Clustering_ParticipantAverage_Corrected",
+  "sd_ddof": 0,
+  "weighted_strength": "s = 1 - w without global maximum normalization"
+}
