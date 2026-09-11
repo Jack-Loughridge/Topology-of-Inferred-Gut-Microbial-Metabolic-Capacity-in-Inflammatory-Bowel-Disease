@@ -1,0 +1,165 @@
+{
+  "created_utc": "2026-09-03T09:22:51.516408+00:00",
+  "environment": {
+    "device": "cpu",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.35",
+    "python": "3.10.12 (main, Mar  3 2026, 11:56:32) [GCC 11.4.0]",
+    "sklearn": "1.7.2",
+    "torch": "2.9.1+cpu"
+  },
+  "inputs": {
+    "v1": {
+      "h0_dir": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/structural_frozen_ibdmdb/h0",
+      "h0_manifest_sha256": "3f2e050a8c04dfdf72feb4e04fcdf636036247771f27bfc15a5ce35a1c3fdd81",
+      "metadata_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/structural_frozen_ibdmdb/ricci_features_frozen_training_order/matched_metadata.csv",
+      "metadata_sha256": "12e40b52d0aba0add403567955e02759b298d9b7cc2a6746ee3e0bb39b42b85d",
+      "n_samples": 90
+    },
+    "v2": {
+      "h0_dir": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/expanded_community_structural_replication_v2/04_h0",
+      "h0_manifest_sha256": "3d3f70dd73d9e657c75045abb117e6dc5562f4042aec79c32d55d1dd3cc73fcb",
+      "metadata_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/expanded_community_structural_replication_v2/01_curated/matched_external_metadata_184.tsv.gz",
+      "metadata_sha256": "79f8a624b13fbaa949d3f6cb7660d093b2f3b848442f4d54232810ba42dd5774",
+      "n_samples": 184
+    }
+  },
+  "method": {
+    "binning": "each model's own frozen float32 outer-training bounds; clip then searchsorted(side='right') - 1",
+    "ensemble": "unweighted arithmetic mean of five frozen repeat-01 outer-model IBD probabilities",
+    "external_rescaling": false,
+    "h0_death_filter": "finite deaths satisfying 0 < d < 1 - TOL, TOL=1e-12",
+    "label_firewall": "all H0 loading, binning and probabilities completed before external metadata was read",
+    "model_refitting": false,
+    "model_status": "corrected outer-training models; not a single full-source refit",
+    "threshold": 0.5,
+    "v1_role": "strict external validation",
+    "v2_role": "exploratory structural replication"
+  },
+  "model_audit_consistent_across_datasets": true,
+  "models": [
+    {
+      "fold": 1,
+      "metadata": {
+        "bounds_source": "all outer-training H0 deaths only",
+        "fold": 1,
+        "repeat": 1,
+        "seed": 102402,
+        "selected_epoch": 62,
+        "selected_percentile_step": 0.7,
+        "stage": "outer_final_refit",
+        "test_samples": 239,
+        "training_samples": 1078
+      },
+      "n_intervals": 138,
+      "path": "DATA_ROOT/H0_AlphaPi_RepeatedCV_TrainOnlyBins_IBD/folds/repeat_01_fold_1/final_outer_model/final_outer_model.pt",
+      "point_chunk": 256,
+      "probability_max": 0.8003270030021667,
+      "probability_median": 0.4858091324567795,
+      "probability_min": 0.20804725587368011,
+      "quad_points": 5,
+      "sha256": "2b997ede2d01a8a88a0dada0b987569d9f824b405fd139a250f3d7036369815d",
+      "sigma_log": 0.06162744524823438
+    },
+    {
+      "fold": 2,
+      "metadata": {
+        "bounds_source": "all outer-training H0 deaths only",
+        "fold": 2,
+        "repeat": 1,
+        "seed": 103411,
+        "selected_epoch": 24,
+        "selected_percentile_step": 0.7,
+        "stage": "outer_final_refit",
+        "test_samples": 293,
+        "training_samples": 1024
+      },
+      "n_intervals": 138,
+      "path": "DATA_ROOT/H0_AlphaPi_RepeatedCV_TrainOnlyBins_IBD/folds/repeat_01_fold_2/final_outer_model/final_outer_model.pt",
+      "point_chunk": 256,
+      "probability_max": 0.6200817823410034,
+      "probability_median": 0.4113427996635437,
+      "probability_min": 0.19280414283275604,
+      "quad_points": 5,
+      "sha256": "38e4d1268c7b2c66eeff46cea9855832a1d62ffe07aee3493182ebf66fb7ebc2",
+      "sigma_log": 0.06135190602373286
+    },
+    {
+      "fold": 3,
+      "metadata": {
+        "bounds_source": "all outer-training H0 deaths only",
+        "fold": 3,
+        "repeat": 1,
+        "seed": 104420,
+        "selected_epoch": 70,
+        "selected_percentile_step": 0.7,
+        "stage": "outer_final_refit",
+        "test_samples": 279,
+        "training_samples": 1038
+      },
+      "n_intervals": 138,
+      "path": "DATA_ROOT/H0_AlphaPi_RepeatedCV_TrainOnlyBins_IBD/folds/repeat_01_fold_3/final_outer_model/final_outer_model.pt",
+      "point_chunk": 256,
+      "probability_max": 0.6684852242469788,
+      "probability_median": 0.4268609881401062,
+      "probability_min": 0.18962301313877106,
+      "quad_points": 5,
+      "sha256": "d9bf9adf065c6dbbbd10ddd0e53d089dbdc90813d95b8d8ff59591cd3b41523c",
+      "sigma_log": 0.06066056814753962
+    },
+    {
+      "fold": 4,
+      "metadata": {
+        "bounds_source": "all outer-training H0 deaths only",
+        "fold": 4,
+        "repeat": 1,
+        "seed": 105429,
+        "selected_epoch": 2,
+        "selected_percentile_step": 0.4,
+        "stage": "outer_final_refit",
+        "test_samples": 235,
+        "training_samples": 1082
+      },
+      "n_intervals": 241,
+      "path": "DATA_ROOT/H0_AlphaPi_RepeatedCV_TrainOnlyBins_IBD/folds/repeat_01_fold_4/final_outer_model/final_outer_model.pt",
+      "point_chunk": 256,
+      "probability_max": 0.6360623836517334,
+      "probability_median": 0.45441098511219025,
+      "probability_min": 0.2789362668991089,
+      "quad_points": 5,
+      "sha256": "1371c2f6d9397a0fe43eb9938b60d52a392f1bca96192c618d80b4cb082c5db9",
+      "sigma_log": 0.03499430695521577
+    },
+    {
+      "fold": 5,
+      "metadata": {
+        "bounds_source": "all outer-training H0 deaths only",
+        "fold": 5,
+        "repeat": 1,
+        "seed": 106438,
+        "selected_epoch": 63,
+        "selected_percentile_step": 0.7,
+        "stage": "outer_final_refit",
+        "test_samples": 271,
+        "training_samples": 1046
+      },
+      "n_intervals": 138,
+      "path": "DATA_ROOT/H0_AlphaPi_RepeatedCV_TrainOnlyBins_IBD/folds/repeat_01_fold_5/final_outer_model/final_outer_model.pt",
+      "point_chunk": 256,
+      "probability_max": 0.6556048393249512,
+      "probability_median": 0.4177616387605667,
+      "probability_min": 0.17002354562282562,
+      "quad_points": 5,
+      "sha256": "38d9ea048e5a74a467ba6772d8f2f515ac49f7cecd27f8fcfa7bd3bdfd98d7fb",
+      "sigma_log": 0.06324973652690002
+    }
+  ],
+  "production_source": {
+    "path": "DATA_ROOT/h0_alpha_pi_repeated_cv/h0_alpha_pi_repeated_cv.py",
+    "sha256": "97c0e15e3e01eb2461c640ac083970780f9a4cf88aa6fdcf92ed092976ac8381"
+  },
+  "script_path": "REPOSITORY_ROOT/external_validation/serrano_gomez/scripts/apply_frozen_h0_alphapi_ensemble_external_ibd_v1_host_subject.py",
+  "script_sha256": "108dca60543d0540871867a8b90e0abf915ee13e28fc9549f961ec3aab3a3164",
+  "script_version": "1.1.0"
+}

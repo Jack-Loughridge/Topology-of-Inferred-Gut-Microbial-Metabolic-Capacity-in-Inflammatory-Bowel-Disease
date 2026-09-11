@@ -1,0 +1,17 @@
+{
+  "graph_dir": "/home/Jack/Real_Data/out_graphs",
+  "meta": "/home/Jack/Real_Data/hmp2_metadata.csv",
+  "out_dir": "/home/Jack/Real_Data/Path_Backbone_LongRange_Diagnostics",
+  "n_source": 100,
+  "n_target": 100,
+  "long_min_hop": 4,
+  "workers": 4,
+  "active_tol": 1e-12,
+  "seed": 20260707,
+  "max_samples": null,
+  "expected_samples": 1317,
+  "expected_participants": 106,
+  "no_resume": false,
+  "write_only": false,
+  "resume": true
+}

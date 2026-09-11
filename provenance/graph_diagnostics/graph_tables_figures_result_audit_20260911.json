@@ -1,0 +1,41 @@
+{
+  "audit_date_utc": "2026-09-11",
+  "source_result_archive": {
+    "name": "phase6f_graph_tables_figures_results_20260911T091510Z.tar.gz",
+    "sha256": "88b424f31604d4c8f321070c5ce422cfc1b869045fda1d438dd33d07d8fe1ba5",
+    "internal_manifest_verified": true
+  },
+  "path_tables_1_to_4": {
+    "sample_graphs_total": 1317,
+    "sample_graphs_valid_overall": 1306,
+    "participants_total": 106,
+    "participants_valid_overall": 106,
+    "maximum_absolute_difference_in_previously_reported_common_numeric_metrics": 0.0
+  },
+  "edge_concentration_table_5": {
+    "sample_graphs_total": 1317,
+    "sample_graphs_valid_overall": 1306,
+    "participants_total": 106,
+    "participants_valid_overall": 106,
+    "maximum_absolute_difference_in_previously_reported_common_numeric_metrics": 0.0
+  },
+  "outdegree_figure": {
+    "sample_graphs_total": 1317,
+    "empty_active_graphs": 11,
+    "participants_total": 106,
+    "empty_graph_policy": "zero histogram before participant averaging",
+    "maximum_absolute_mean_difference_from_prior_nonzero_participant_export": 0.05268564768550732,
+    "maximum_absolute_population_sd_difference_from_prior_nonzero_participant_export": 0.14355876814953916,
+    "canonical_manuscript_figure_replacement_required": true
+  },
+  "weight_density_figures": {
+    "sample_graphs_total": 1317,
+    "nonempty_sample_graphs": 1306,
+    "participants_total": 106,
+    "empty_graph_policy": "zero density curve before participant averaging",
+    "maximum_absolute_difference_from_prior_curve": 2.89e-15,
+    "canonical_rerender_recommended": true
+  },
+  "privacy": "Tracked files contain aggregate results only; no sample or participant identifiers are retained.",
+  "excluded_stale_file": "all_sampled_path_backbone_tables_for_overleaf.tex"
+}

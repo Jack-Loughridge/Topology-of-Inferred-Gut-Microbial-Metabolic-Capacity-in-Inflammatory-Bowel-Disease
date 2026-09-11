@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+\centering
+\caption{External IBD versus non-IBD performance of the frozen IBDMDB species-abundance benchmark models in the Serrano--G\'omez cohort. Participant-level probabilities are arithmetic means across samples from the same participant. No external refitting, scaling, calibration, or threshold selection was performed.}
+\label{tab:external-species-benchmarks-ibd}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrrrr}
+\toprule
+Model & Level & $n$ & Accuracy & Bal. acc. & Macro F1 & ROC--AUC & AP$_{\mathrm{IBD}}$ & Recall$_{\mathrm{nonIBD}}$ & Recall$_{\mathrm{IBD}}$ \\
+\midrule
+Species L1 logistic & Sample & 90 & 0.667 & 0.561 & 0.518 & 0.687 & 0.939 & 0.417 & 0.705 \\
+ & Participant & 78 & 0.641 & 0.549 & 0.513 & 0.667 & 0.921 & 0.417 & 0.682 \\
+\addlinespace
+Species random forest & Sample & 90 & 0.867 & 0.500 & 0.464 & 0.705 & 0.936 & 0.000 & 1.000 \\
+ & Participant & 78 & 0.846 & 0.500 & 0.458 & 0.683 & 0.917 & 0.000 & 1.000 \\
+\addlinespace
+Species XGBoost & Sample & 90 & 0.867 & 0.676 & 0.689 & 0.732 & 0.947 & 0.417 & 0.936 \\
+ & Participant & 78 & 0.859 & 0.678 & 0.697 & 0.711 & 0.931 & 0.417 & 0.939 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

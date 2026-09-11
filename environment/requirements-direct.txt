@@ -1,0 +1,18 @@
+# Direct portable requirements for the modern analysis environment.
+# This is deliberately not described as a fully resolved dependency lock.
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.4
+matplotlib>=3.8
+torch>=2.0
+networkx>=3.2
+xgboost>=2.0
+pyarrow>=14
+openpyxl>=3.1
+fastparquet>=2024.2
+tqdm>=4.66
+joblib>=1.3
+threadpoolctl>=3.4
+PyYAML>=5.4
+pytest>=8.0

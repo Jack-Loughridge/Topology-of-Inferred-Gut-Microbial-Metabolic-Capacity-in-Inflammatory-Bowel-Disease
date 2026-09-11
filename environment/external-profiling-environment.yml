@@ -1,0 +1,17 @@
+# Reconstruction candidate based on Conda metadata observed on 2026-09-02.
+# This is not a fully resolved lock. See README.md for the DIAMOND discrepancy.
+name: tda-ibd-external-profiling
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12.13
+  - biom-format=2.1.17
+  - bowtie2=2.5.5
+  - diamond=2.2.2
+  - humann=3.9
+  - kneaddata=0.12.4
+  - metaphlan=4.0.6
+  - numpy=2.5.0
+  - pandas=3.0.3

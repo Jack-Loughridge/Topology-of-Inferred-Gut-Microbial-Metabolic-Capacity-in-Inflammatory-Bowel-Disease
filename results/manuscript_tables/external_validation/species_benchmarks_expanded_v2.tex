@@ -1,0 +1,32 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{Transfer of frozen IBDMDB species-abundance benchmark models trained after last-occurrence duplicate resolution to the complete Serrano--G\'omez external cohort and the subset paired with structural v1.}
+\label{tab:external_species_benchmarks_all184_paired90}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrrrrrrrr}
+\toprule
+Model & Cohort & Unit & $n$ & Acc. & Bal. acc. & Macro F1 & ROC--AUC & AP$_{\mathrm{IBD}}$ & Rec. nonIBD & Rec. IBD \\
+\midrule
+Species L1 logistic & All 184 & Sample & 184 & 0.745 & 0.611 & 0.550 & 0.737 & 0.965 & 0.444 & 0.777 \\
+ & All 184 & Participant & 154 & 0.727 & 0.605 & 0.554 & 0.724 & 0.954 & 0.444 & 0.765 \\
+ & Paired 90 & Sample & 90 & 0.667 & 0.561 & 0.518 & 0.687 & 0.939 & 0.417 & 0.705 \\
+ & Paired 90 & Participant & 78 & 0.641 & 0.549 & 0.513 & 0.667 & 0.921 & 0.417 & 0.682 \\
+\addlinespace
+Species random forest & All 184 & Sample & 184 & 0.902 & 0.500 & 0.474 & 0.671 & 0.940 & 0.000 & 1.000 \\
+ & All 184 & Participant & 154 & 0.883 & 0.500 & 0.469 & 0.661 & 0.926 & 0.000 & 1.000 \\
+ & Paired 90 & Sample & 90 & 0.867 & 0.500 & 0.464 & 0.705 & 0.936 & 0.000 & 1.000 \\
+ & Paired 90 & Participant & 78 & 0.846 & 0.500 & 0.458 & 0.683 & 0.917 & 0.000 & 1.000 \\
+\addlinespace
+Species XGBoost & All 184 & Sample & 184 & 0.891 & 0.618 & 0.637 & 0.733 & 0.956 & 0.278 & 0.958 \\
+ & All 184 & Participant & 154 & 0.883 & 0.621 & 0.646 & 0.721 & 0.944 & 0.278 & 0.963 \\
+ & Paired 90 & Sample & 90 & 0.867 & 0.676 & 0.689 & 0.732 & 0.947 & 0.417 & 0.936 \\
+ & Paired 90 & Participant & 78 & 0.859 & 0.678 & 0.697 & 0.711 & 0.931 & 0.417 & 0.939 \\
+\bottomrule
+\end{tabular}
+}
+\begin{minipage}{0.98\linewidth}
+\footnotesize
+All models, their 508-species input order, CLR pseudocount, variance mask, source-fitted scaler and 0.5 decision threshold were frozen. No external refitting, rescaling, calibration or threshold selection was performed. Participant probabilities are arithmetic means across samples. The paired cohort contains exactly the 90 samples used in structural external v1. AP denotes IBD average precision.
+\end{minipage}
+\end{table}

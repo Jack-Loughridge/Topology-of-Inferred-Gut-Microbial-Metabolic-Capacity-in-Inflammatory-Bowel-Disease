@@ -1,0 +1,44 @@
+{
+  "graph_dir": "/home/Jack/Real_Data/out_graphs",
+  "meta": "/home/Jack/Real_Data/hmp2_metadata.csv",
+  "out_dir": "/home/Jack/Real_Data/Path_Backbone_EdgeConcentration_WeightTop001",
+  "n_source": 100,
+  "n_target": 100,
+  "workers": 4,
+  "active_tol": 1e-12,
+  "seed": 20260707,
+  "max_samples": null,
+  "expected_samples": 1317,
+  "expected_participants": 106,
+  "no_resume": false,
+  "write_only": true,
+  "resume": true,
+  "top_fracs": [
+    [
+      0.001,
+      "top0p1pct",
+      "Top 0.1\\%"
+    ],
+    [
+      0.01,
+      "top1pct",
+      "Top 1\\%"
+    ],
+    [
+      0.05,
+      "top5pct",
+      "Top 5\\%"
+    ],
+    [
+      0.1,
+      "top10pct",
+      "Top 10\\%"
+    ]
+  ],
+  "definition": {
+    "edge_rank": "rank active directed edges by sampled path traversal count",
+    "traversal_share": "fraction of all sampled path-edge traversals accounted for by the top-used edge set",
+    "median_w": "median edge weight w among positively used edges in the top-used edge set",
+    "interpretation": "lower w means stronger inferred microbial support"
+  }
+}

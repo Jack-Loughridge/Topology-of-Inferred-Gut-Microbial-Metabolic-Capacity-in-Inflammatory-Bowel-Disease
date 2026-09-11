@@ -1,0 +1,85 @@
+{
+  "audit_date_utc": "2026-09-11",
+  "audit_status": "passed",
+  "source_archives": {
+    "raw_evidence_bundle": {
+      "internal_manifest_entries": 54,
+      "internal_manifest_sha256": "29c040bed4e1ea0ec2d18b678fff5235270b2c5eca6b16836ed9d6dd4fcff494",
+      "internal_manifest_verified": true,
+      "name": "ricci_ablation_repo_gap_bundle_20260911T155448Z.tar.gz",
+      "sha256": "5084087508ff0bf4f1c81b3316fae94e3c13d01efd80afc5a894db19254e3185"
+    },
+    "compact_summary_bundle": {
+      "name": "ricci_ibd_feature_block_ablation_summary_20260911.tar.gz",
+      "role": "Recovered ablation_repetition_metrics_long.csv, which the raw-evidence transfer filter omitted; its SHA-256 matches the production output manifest.",
+      "sha256": "0e58283aa38d70682c3ec6cde01cfe0a73e7f005049a48c52b5d326cb45eec9b"
+    }
+  },
+  "source_code": {
+    "ablation_driver_sha256": "e5b080b57874067422c858f35ddd517d2932e0559f65bd5f4c50fe8aa8033128",
+    "canonical_engine_sha256": "88b4110b482cdde7d1a77803835ca3d5b8b414ee956c5987ce5acddeabb66682",
+    "self_test_status": "passed"
+  },
+  "scientific_design": {
+    "C": 0.02,
+    "model": "Fold-internal StandardScaler followed by L1 LogisticRegression(solver=saga, class_weight=balanced)",
+    "participant_aggregation": "Arithmetic mean of held-out sample probabilities within participant",
+    "repetitions": 20,
+    "splits_per_repetition": 5,
+    "task": "IBD (UC + CD) versus non-IBD"
+  },
+  "raw_oof_verification": {
+    "B only": {
+      "convergence_warning_folds": 0,
+      "duplicate_repeat_participant_keys": 0,
+      "duplicate_repeat_sample_keys": 0,
+      "fold_models": 100,
+      "maximum_fold_participant_overlap": 0,
+      "maximum_n_iter": 7381,
+      "maximum_participant_probability_reconstruction_error": 9.71445146547012e-17,
+      "participant_oof_rows": 2120,
+      "participants_per_repetition": 106,
+      "sample_oof_rows": 26340,
+      "samples_per_repetition": 1317
+    },
+    "K0 only": {
+      "convergence_warning_folds": 0,
+      "duplicate_repeat_participant_keys": 0,
+      "duplicate_repeat_sample_keys": 0,
+      "fold_models": 100,
+      "maximum_fold_participant_overlap": 0,
+      "maximum_n_iter": 4617,
+      "maximum_participant_probability_reconstruction_error": 1.1102230246251565e-16,
+      "participant_oof_rows": 2120,
+      "participants_per_repetition": 106,
+      "sample_oof_rows": 26340,
+      "samples_per_repetition": 1317
+    },
+    "[B|K0]": {
+      "convergence_warning_folds": 0,
+      "duplicate_repeat_participant_keys": 0,
+      "duplicate_repeat_sample_keys": 0,
+      "fold_models": 100,
+      "maximum_fold_participant_overlap": 0,
+      "maximum_n_iter": 7799,
+      "maximum_participant_probability_reconstruction_error": 1.1102230246251565e-16,
+      "participant_oof_rows": 2120,
+      "participants_per_repetition": 106,
+      "sample_oof_rows": 26340,
+      "samples_per_repetition": 1317
+    },
+    "maximum_ablation_summary_reconstruction_error": 9.71445146547012e-17,
+    "maximum_paired_delta_reconstruction_error": 9.8879238130678e-17,
+    "maximum_stored_repetition_metric_reconstruction_error": 2.220446049250313e-16
+  },
+  "release_boundary": {
+    "excluded_from_git": [
+      "sample-level OOF predictions containing sample and participant identifiers",
+      "participant-level OOF predictions containing participant identifiers",
+      "split manifests containing sample or participant identifiers",
+      "feature metadata, edge metadata, fitted models, and large feature matrices"
+    ],
+    "tracked_subset_contains_sample_or_participant_identifiers": false,
+    "untracked_raw_evidence_destination": "Permanent derived-results archive"
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "logistic_l1": {
+    "model_label": "Species L1 logistic",
+    "participant_probability_averaged": {
+      "accuracy": 0.6410256410256411,
+      "average_precision_ibd": 0.9213806379316754,
+      "balanced_accuracy": 0.5492424242424242,
+      "brier": 0.21538013355881278,
+      "class_counts": {
+        "IBD": 66,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          5,
+          7
+        ],
+        [
+          21,
+          45
+        ]
+      ],
+      "log_loss": 0.6399223919067991,
+      "macro_f1": 0.5129348795718108,
+      "n": 78,
+      "recall_IBD": 0.6818181818181818,
+      "recall_nonIBD": 0.4166666666666667,
+      "roc_auc": 0.6666666666666666,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.6666666666666666,
+      "average_precision_ibd": 0.9386508588616498,
+      "balanced_accuracy": 0.5608974358974359,
+      "brier": 0.20621805055585476,
+      "class_counts": {
+        "IBD": 78,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          5,
+          7
+        ],
+        [
+          23,
+          55
+        ]
+      ],
+      "log_loss": 0.6312857790755741,
+      "macro_f1": 0.5178571428571428,
+      "n": 90,
+      "recall_IBD": 0.7051282051282052,
+      "recall_nonIBD": 0.4166666666666667,
+      "roc_auc": 0.686965811965812,
+      "threshold": 0.5
+    }
+  },
+  "random_forest": {
+    "model_label": "Species random forest",
+    "participant_probability_averaged": {
+      "accuracy": 0.8461538461538461,
+      "average_precision_ibd": 0.9168078113922652,
+      "balanced_accuracy": 0.5,
+      "brier": 0.11995770727590116,
+      "class_counts": {
+        "IBD": 66,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          0,
+          12
+        ],
+        [
+          0,
+          66
+        ]
+      ],
+      "log_loss": 0.3967328951132379,
+      "macro_f1": 0.4583333333333333,
+      "n": 78,
+      "recall_IBD": 1.0,
+      "recall_nonIBD": 0.0,
+      "roc_auc": 0.6830808080808081,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.8666666666666667,
+      "average_precision_ibd": 0.9360624733407614,
+      "balanced_accuracy": 0.5,
+      "brier": 0.10632468479797869,
+      "class_counts": {
+        "IBD": 78,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          0,
+          12
+        ],
+        [
+          0,
+          78
+        ]
+      ],
+      "log_loss": 0.3607635447081961,
+      "macro_f1": 0.4642857142857143,
+      "n": 90,
+      "recall_IBD": 1.0,
+      "recall_nonIBD": 0.0,
+      "roc_auc": 0.7051282051282052,
+      "threshold": 0.5
+    }
+  },
+  "xgboost": {
+    "model_label": "Species XGBoost",
+    "participant_probability_averaged": {
+      "accuracy": 0.8589743589743589,
+      "average_precision_ibd": 0.9311333966296815,
+      "balanced_accuracy": 0.6780303030303031,
+      "brier": 0.12511639458302648,
+      "class_counts": {
+        "IBD": 66,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          5,
+          7
+        ],
+        [
+          4,
+          62
+        ]
+      ],
+      "log_loss": 0.40278353226611047,
+      "macro_f1": 0.6973544973544974,
+      "n": 78,
+      "recall_IBD": 0.9393939393939394,
+      "recall_nonIBD": 0.4166666666666667,
+      "roc_auc": 0.7108585858585859,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.8666666666666667,
+      "average_precision_ibd": 0.9471468876405138,
+      "balanced_accuracy": 0.6762820512820513,
+      "brier": 0.11225293536431549,
+      "class_counts": {
+        "IBD": 78,
+        "nonIBD": 12
+      },
+      "confusion_matrix": [
+        [
+          5,
+          7
+        ],
+        [
+          5,
+          73
+        ]
+      ],
+      "log_loss": 0.36692137604602654,
+      "macro_f1": 0.6892980437284235,
+      "n": 90,
+      "recall_IBD": 0.9358974358974359,
+      "recall_nonIBD": 0.4166666666666667,
+      "roc_auc": 0.7318376068376068,
+      "threshold": 0.5
+    }
+  }
+}

@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Please cite the associated manuscript when using this software."
+title: "Repeated species-abundance benchmarks for topological IBD classification"
+type: software
+authors:
+  - family-names: Loughridge
+    given-names: Jack
+year: 2026
+license: MIT
+version: 1.0.0
