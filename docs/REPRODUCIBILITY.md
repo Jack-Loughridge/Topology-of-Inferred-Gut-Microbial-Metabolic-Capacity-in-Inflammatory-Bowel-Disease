@@ -107,6 +107,18 @@ replacement path. The locked configurations, recovery evidence, exclusion
 accounting, and correction rationale are in
 `provenance/GRAPH_DIAGNOSTICS_CORRECTION.md`.
 
+Tables 1--5 were regenerated from the completed per-sample path cache using
+the promoted path-backbone and enhanced edge-concentration sources. The four
+path-quantile tables and Table 5 report valid/total units explicitly. The
+aggregate path metrics are numerically identical to the previously reviewed
+tables; the new table files make the 11 empty active graphs explicit.
+
+The promoted outdegree and weight-density generators were replayed on all
+1,317 graphs. Empty active graphs contribute zero histograms or zero density
+curves before participant averaging. Final aggregate source data, PNG/PDF
+figures, run configurations, and the result audit are tracked under
+`results/` and `provenance/graph_diagnostics/`.
+
 ### 4. Establish locked participant-grouped splits
 
 The repeated joint-analysis preflight constructs and audits task-specific split manifests. Those exact manifests are consumed by the repeated Ricci and species analyses rather than independently regenerating folds.

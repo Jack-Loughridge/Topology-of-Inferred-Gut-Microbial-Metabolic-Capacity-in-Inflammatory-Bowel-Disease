@@ -1,0 +1,29 @@
+\begin{table}[ht]
+\centering
+\caption{Directed path mean-$w^2$ quantiles across all sampled reachable source--target pairs. For each sampled path, mean $w^2$ is computed across the directed edges in the selected path. No minimum path-length restriction is applied. The $n$ column reports valid/total units. Values are mean $\pm$ SD.}
+\label{tab:all_sampled_mean_w2_quantiles}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lllrrrrrrrrrrrr}
+\toprule
+Level & Path type & Condition & $n$ valid/total & q1 & q5 & q10 & q20 & q30 & q50 & q70 & q80 & q90 & q95 & q99 \\
+\midrule
+sample graphwise & minimum-hop & overall & 1306/1317 & 0.015 $\pm$ 0.023 & 0.042 $\pm$ 0.042 & 0.061 $\pm$ 0.051 & 0.089 $\pm$ 0.065 & 0.117 $\pm$ 0.076 & 0.179 $\pm$ 0.096 & 0.259 $\pm$ 0.111 & 0.313 $\pm$ 0.117 & 0.394 $\pm$ 0.124 & 0.463 $\pm$ 0.129 & 0.606 $\pm$ 0.142 \\
+sample graphwise & minimum-hop & CD & 589/591 & 0.012 $\pm$ 0.021 & 0.035 $\pm$ 0.039 & 0.053 $\pm$ 0.048 & 0.078 $\pm$ 0.061 & 0.104 $\pm$ 0.073 & 0.164 $\pm$ 0.095 & 0.242 $\pm$ 0.113 & 0.298 $\pm$ 0.120 & 0.382 $\pm$ 0.126 & 0.452 $\pm$ 0.130 & 0.596 $\pm$ 0.144 \\
+sample graphwise & minimum-hop & UC & 360/367 & 0.013 $\pm$ 0.020 & 0.041 $\pm$ 0.038 & 0.059 $\pm$ 0.048 & 0.087 $\pm$ 0.061 & 0.113 $\pm$ 0.072 & 0.175 $\pm$ 0.091 & 0.255 $\pm$ 0.106 & 0.307 $\pm$ 0.114 & 0.383 $\pm$ 0.125 & 0.451 $\pm$ 0.131 & 0.590 $\pm$ 0.145 \\
+sample graphwise & minimum-hop & non-IBD & 357/359 & 0.022 $\pm$ 0.027 & 0.056 $\pm$ 0.046 & 0.078 $\pm$ 0.056 & 0.110 $\pm$ 0.069 & 0.141 $\pm$ 0.079 & 0.207 $\pm$ 0.094 & 0.290 $\pm$ 0.106 & 0.345 $\pm$ 0.110 & 0.425 $\pm$ 0.114 & 0.495 $\pm$ 0.119 & 0.637 $\pm$ 0.129 \\
+sample graphwise & minimax & overall & 1306/1317 & 0.003 $\pm$ 0.008 & 0.010 $\pm$ 0.018 & 0.018 $\pm$ 0.027 & 0.033 $\pm$ 0.040 & 0.050 $\pm$ 0.052 & 0.094 $\pm$ 0.075 & 0.160 $\pm$ 0.099 & 0.212 $\pm$ 0.112 & 0.295 $\pm$ 0.127 & 0.371 $\pm$ 0.136 & 0.519 $\pm$ 0.147 \\
+sample graphwise & minimax & CD & 589/591 & 0.003 $\pm$ 0.008 & 0.008 $\pm$ 0.017 & 0.014 $\pm$ 0.024 & 0.026 $\pm$ 0.037 & 0.041 $\pm$ 0.048 & 0.080 $\pm$ 0.071 & 0.144 $\pm$ 0.097 & 0.194 $\pm$ 0.112 & 0.277 $\pm$ 0.129 & 0.355 $\pm$ 0.138 & 0.507 $\pm$ 0.148 \\
+sample graphwise & minimax & UC & 360/367 & 0.003 $\pm$ 0.007 & 0.009 $\pm$ 0.015 & 0.016 $\pm$ 0.023 & 0.032 $\pm$ 0.037 & 0.048 $\pm$ 0.050 & 0.091 $\pm$ 0.073 & 0.157 $\pm$ 0.097 & 0.208 $\pm$ 0.108 & 0.289 $\pm$ 0.124 & 0.362 $\pm$ 0.134 & 0.505 $\pm$ 0.149 \\
+sample graphwise & minimax & non-IBD & 357/359 & 0.005 $\pm$ 0.009 & 0.015 $\pm$ 0.022 & 0.025 $\pm$ 0.031 & 0.046 $\pm$ 0.045 & 0.067 $\pm$ 0.057 & 0.118 $\pm$ 0.077 & 0.191 $\pm$ 0.097 & 0.245 $\pm$ 0.108 & 0.330 $\pm$ 0.121 & 0.406 $\pm$ 0.127 & 0.555 $\pm$ 0.136 \\
+participant average & minimum-hop & overall & 106/106 & 0.017 $\pm$ 0.020 & 0.045 $\pm$ 0.036 & 0.064 $\pm$ 0.045 & 0.092 $\pm$ 0.055 & 0.119 $\pm$ 0.061 & 0.180 $\pm$ 0.072 & 0.260 $\pm$ 0.078 & 0.314 $\pm$ 0.080 & 0.394 $\pm$ 0.082 & 0.463 $\pm$ 0.082 & 0.605 $\pm$ 0.085 \\
+participant average & minimum-hop & CD & 50/50 & 0.015 $\pm$ 0.022 & 0.039 $\pm$ 0.041 & 0.057 $\pm$ 0.050 & 0.084 $\pm$ 0.061 & 0.110 $\pm$ 0.069 & 0.170 $\pm$ 0.080 & 0.249 $\pm$ 0.087 & 0.305 $\pm$ 0.089 & 0.389 $\pm$ 0.090 & 0.459 $\pm$ 0.090 & 0.603 $\pm$ 0.089 \\
+participant average & minimum-hop & UC & 30/30 & 0.016 $\pm$ 0.015 & 0.045 $\pm$ 0.030 & 0.064 $\pm$ 0.037 & 0.092 $\pm$ 0.046 & 0.118 $\pm$ 0.053 & 0.177 $\pm$ 0.061 & 0.255 $\pm$ 0.066 & 0.306 $\pm$ 0.069 & 0.381 $\pm$ 0.072 & 0.448 $\pm$ 0.073 & 0.585 $\pm$ 0.078 \\
+participant average & minimum-hop & non-IBD & 26/26 & 0.022 $\pm$ 0.018 & 0.055 $\pm$ 0.031 & 0.077 $\pm$ 0.038 & 0.108 $\pm$ 0.046 & 0.138 $\pm$ 0.051 & 0.203 $\pm$ 0.060 & 0.286 $\pm$ 0.066 & 0.340 $\pm$ 0.068 & 0.420 $\pm$ 0.069 & 0.490 $\pm$ 0.071 & 0.632 $\pm$ 0.078 \\
+participant average & minimax & overall & 106/106 & 0.004 $\pm$ 0.007 & 0.011 $\pm$ 0.016 & 0.019 $\pm$ 0.023 & 0.035 $\pm$ 0.034 & 0.052 $\pm$ 0.044 & 0.096 $\pm$ 0.060 & 0.162 $\pm$ 0.073 & 0.213 $\pm$ 0.079 & 0.295 $\pm$ 0.085 & 0.369 $\pm$ 0.088 & 0.517 $\pm$ 0.089 \\
+participant average & minimax & CD & 50/50 & 0.003 $\pm$ 0.008 & 0.010 $\pm$ 0.017 & 0.016 $\pm$ 0.025 & 0.030 $\pm$ 0.038 & 0.045 $\pm$ 0.048 & 0.085 $\pm$ 0.065 & 0.150 $\pm$ 0.079 & 0.200 $\pm$ 0.086 & 0.283 $\pm$ 0.092 & 0.360 $\pm$ 0.095 & 0.512 $\pm$ 0.093 \\
+participant average & minimax & UC & 30/30 & 0.003 $\pm$ 0.005 & 0.010 $\pm$ 0.013 & 0.019 $\pm$ 0.019 & 0.035 $\pm$ 0.029 & 0.053 $\pm$ 0.038 & 0.096 $\pm$ 0.053 & 0.161 $\pm$ 0.064 & 0.211 $\pm$ 0.068 & 0.289 $\pm$ 0.074 & 0.359 $\pm$ 0.077 & 0.499 $\pm$ 0.081 \\
+participant average & minimax & non-IBD & 26/26 & 0.005 $\pm$ 0.006 & 0.015 $\pm$ 0.015 & 0.025 $\pm$ 0.021 & 0.045 $\pm$ 0.031 & 0.066 $\pm$ 0.039 & 0.115 $\pm$ 0.051 & 0.186 $\pm$ 0.064 & 0.240 $\pm$ 0.070 & 0.324 $\pm$ 0.077 & 0.400 $\pm$ 0.079 & 0.549 $\pm$ 0.080 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

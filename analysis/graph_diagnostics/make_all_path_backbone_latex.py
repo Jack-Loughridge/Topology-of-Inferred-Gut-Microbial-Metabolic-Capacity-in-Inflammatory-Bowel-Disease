@@ -220,7 +220,7 @@ def main():
         out_dir / "latex_all_sampled_minimum_support_quantiles.tex",
         out_dir / "latex_all_sampled_mean_w2_quantiles.tex",
     ]
-    combined.write_text("\n\n".join(p.read_text() for p in parts) + "\n")
+    combined.write_text("\n\n".join(p.read_text().rstrip() for p in parts) + "\n")
 
     print("Wrote unrestricted/all-path Tables 1--4 to:")
     for p in parts:

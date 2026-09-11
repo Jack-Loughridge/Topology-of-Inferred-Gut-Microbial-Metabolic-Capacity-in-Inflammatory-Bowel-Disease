@@ -54,6 +54,27 @@ Relevant recovered source SHA-256 values were:
 - enhanced edge-concentration generator: `0f20fd0049ec9a3517ee4e5017e6339adde0a1d74a276b1352d383e3441a99ee`;
 - all-path LaTeX assembler: `07528437a61ad1358414417ef018a8fb348a869db286c854d23ca5fd71ee69cb`.
 
-The final corrected outputs, their hashes, and manuscript figure/table copies
-must be recorded in a separate result-freeze commit after the two lightweight
-figure reruns and cached table re-aggregation complete.
+## Result freeze
+
+The cached path aggregation and both corrected figure reruns completed on
+2026-09-11. Tables 1--5 reproduce every previously reviewed common numeric
+metric exactly while adding valid/total counts: 1,306/1,317 sample graphs and
+106/106 participants overall. The weight-density aggregate reproduces the
+prior curve to floating-point precision (maximum absolute difference
+`2.89e-15`).
+
+The corrected outdegree generator produces nonzero distributions. Relative to
+the earlier nonzero participant-level export, its largest condition/bin mean
+change is 0.052686 vertices and its largest population-SD change is 0.143559
+vertices; these differences are negligible for interpretation but the new
+figure is the canonical manuscript copy. The archived parser-derived zero
+summary remains noncanonical.
+
+The exact comparison, input result-archive hash, aggregation policies, and
+tracked-output hashes are recorded in
+`provenance/graph_diagnostics/graph_tables_figures_result_audit_20260911.json`
+and `graph_tables_figures_output_manifest_20260911.sha256`.
+
+The result-freeze commit also normalises the combined Tables 1--4 writer to
+emit exactly one final newline, avoiding a Git whitespace warning without
+changing any LaTeX content or scientific value.

@@ -38,9 +38,9 @@ items that depend on the two remaining Ricci computations.
       citation, release version, and release date to `CITATION.cff`.
 - [x] Run the corrected active-vertex directed-clustering implementation,
       review valid/total counts, and track the replacement manuscript table.
-- [ ] Re-aggregate Tables 1--5 with valid/total counts and track their final
+- [x] Re-aggregate Tables 1--5 with valid/total counts and track their final
       LaTeX and aggregate source CSV files.
-- [ ] Rerun the corrected outdegree and edge-weight figure generators, compare
+- [x] Rerun the corrected outdegree and edge-weight figure generators, compare
       against the manuscript copies, and track the final aggregate data and
       PNG/PDF files.
 
