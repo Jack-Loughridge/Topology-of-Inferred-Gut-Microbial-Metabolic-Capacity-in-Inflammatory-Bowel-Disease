@@ -17,6 +17,18 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent
 EXPECTED_SOURCE_FILES = 191
+SUPPLEMENTARY_MANIFESTS = (
+    (
+        ROOT / "provenance/ricci_ibd_feature_block_ablation/source_manifest_20260911.sha256",
+        5,
+        "Ricci IBD feature-block ablation source manifest",
+    ),
+    (
+        ROOT / "provenance/ricci_ibd_feature_block_ablation/result_manifest_20260911.sha256",
+        28,
+        "Ricci IBD feature-block ablation result manifest",
+    ),
+)
 CANONICAL_SOURCE_ROOTS = (
     ROOT / "pipeline",
     ROOT / "analysis",
@@ -35,6 +47,7 @@ SYNTHETIC_SUITES = (
     ("H0 Alpha-Pi five-task self-test", ROOT / "analysis/h0_alpha_pi/five_task_1x5", ("self_test.py",)),
     ("H0 Alpha-Pi IBD repeated-CV self-test", ROOT / "analysis/h0_alpha_pi/ibd_repeated_cv", ("self_test.py",)),
     ("joint repeated-CV self-test", ROOT / "analysis/joint/repeated_cv", ("self_test.py",)),
+    ("Ricci IBD feature-block ablation self-test", ROOT / "analysis/ricci/ibd_block_ablation", ("self_test.py",)),
     ("Ricci five-task repeated-CV self-test", ROOT / "analysis/ricci/five_task_repeated_cv", ("self_test.py",)),
     ("species IBD complete-case self-test", ROOT / "analysis/species/ibd_complete_case", ("self_test.py",)),
     ("species remaining-task self-test", ROOT / "analysis/species/remaining_tasks", ("self_test.py",)),
@@ -88,6 +101,49 @@ def verify_source_manifest() -> None:
     if failures:
         raise RuntimeError("source manifest verification failed:\n  " + "\n  ".join(failures))
     print(f"OK: source manifest ({len(lines)} files)")
+
+
+def verify_supplementary_manifests() -> None:
+    for manifest, expected_entries, label in SUPPLEMENTARY_MANIFESTS:
+        lines = [
+            line
+            for line in manifest.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if len(lines) != expected_entries:
+            raise RuntimeError(
+                f"{label} has {len(lines)} entries; expected {expected_entries}"
+            )
+
+        seen: set[str] = set()
+        failures: list[str] = []
+        for line_number, line in enumerate(lines, start=1):
+            try:
+                expected, relative = line.split(maxsplit=1)
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"malformed {label} line {line_number}"
+                ) from exc
+            relative = relative.removeprefix("*")
+            relative_path = Path(relative)
+            if relative_path.is_absolute() or ".." in relative_path.parts:
+                failures.append(f"unsafe manifest path: {relative}")
+                continue
+            if relative in seen:
+                failures.append(f"duplicate manifest path: {relative}")
+                continue
+            seen.add(relative)
+            path = ROOT / relative_path
+            if not path.is_file():
+                failures.append(f"missing: {relative}")
+            elif sha256(path) != expected:
+                failures.append(f"checksum mismatch: {relative}")
+
+        if failures:
+            raise RuntimeError(
+                f"{label} verification failed:\n  " + "\n  ".join(failures)
+            )
+        print(f"OK: {label} ({len(lines)} files)")
 
 
 def validate_structured_metadata() -> None:
@@ -171,6 +227,7 @@ def validate_tracked_hygiene() -> None:
 
 def run_static_checks() -> None:
     verify_source_manifest()
+    verify_supplementary_manifests()
     validate_structured_metadata()
     validate_python_syntax()
     validate_shell_syntax()
