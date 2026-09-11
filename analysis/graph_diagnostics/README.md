@@ -1,7 +1,71 @@
 # Graph diagnostics
 
-This directory contains the canonical publication implementations for two
-diagnostics on the active directed metabolic graphs.
+This directory contains the canonical publication implementations for graph
+diagnostics on the active directed metabolic graphs. All promoted generators
+use the same safe GraphML parsing rule: child `data` elements remain intact
+until their parent edge has been read, duplicate directed edges retain the
+minimum weight, and active edges satisfy `w < 1 - active_tol`.
+
+## Path-backbone Tables 1--5
+
+`path_backbone_longrange_diagnostics.py` is the deterministic sampled-path
+engine. It computes minimum-hop and minimax path summaries plus path-edge reuse
+from 100 sources and up to 100 reachable targets per source using seed
+`20260707`. Existing per-sample JSON results can be re-aggregated without
+repeating the expensive path search:
+
+```bash
+python3 analysis/graph_diagnostics/path_backbone_longrange_diagnostics.py \
+  --out-dir "$HOME/Real_Data/Path_Backbone_LongRange_Diagnostics" \
+  --long-min-hop 4 --expected-samples 1317 --expected-participants 106 \
+  --write-only
+
+python3 analysis/graph_diagnostics/make_all_path_backbone_latex.py \
+  --input-dir "$HOME/Real_Data/Path_Backbone_LongRange_Diagnostics"
+```
+
+`edge_concentration_weight_top001.py` generates the enhanced concentration and
+median-weight table (Table 5) and now imports the adjacent canonical path
+engine instead of an untracked file under `~/Real_Data`:
+
+```bash
+python3 analysis/graph_diagnostics/edge_concentration_weight_top001.py \
+  --out-dir "$HOME/Real_Data/Path_Backbone_EdgeConcentration_WeightTop001" \
+  --expected-samples 1317 --expected-participants 106 --write-only
+```
+
+The condition summaries and LaTeX tables report valid/total counts. Empty
+active graphs retain a visible total count but do not enter moments for
+undefined path or concentration metrics.
+
+## Outdegree and edge-weight figures
+
+The two canonical participant-balanced figure generators are
+`outdegree_hist_active_participant_mean_cap6_excl0.py` and
+`weight_density_curves_participant_average_clip099.py`. Both supersede local
+snapshots whose streaming parsers cleared edge-data children prematurely.
+
+Production commands:
+
+```bash
+python3 analysis/graph_diagnostics/outdegree_hist_active_participant_mean_cap6_excl0.py \
+  --graph-dir "$HOME/Real_Data/out_graphs" \
+  --metadata "$HOME/Real_Data/hmp2_metadata.csv" \
+  --output-dir "$HOME/Real_Data/Outdegree_ParticipantAverage_Corrected_20260911" \
+  --active-tol 1e-12 --sd-ddof 0 \
+  --expected-samples 1317 --expected-participants 106
+
+python3 analysis/graph_diagnostics/weight_density_curves_participant_average_clip099.py \
+  --graph-dir "$HOME/Real_Data/out_graphs" \
+  --metadata "$HOME/Real_Data/hmp2_metadata.csv" \
+  --output-dir "$HOME/Real_Data/Weight_Density_ParticipantAverage_Corrected_20260911" \
+  --active-tol 1e-12 --clip-max 0.99 --n-bin-edges 200 \
+  --expected-samples 1317 --expected-participants 106
+```
+
+For both figures, an empty active graph contributes an all-zero sample curve or
+histogram. This reproduces the historical participant hierarchy and is stated
+in the generated run configuration rather than being an implicit exclusion.
 
 ## Directed clustering
 

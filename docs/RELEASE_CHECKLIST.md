@@ -22,6 +22,10 @@ items that depend on the two remaining Ricci computations.
 - [x] Update GitHub Actions to Node 24-compatible, commit-pinned action releases.
 - [x] Recover the full sequential routing-attack generator, make its GraphML
       parser self-contained, and track its aggregate source data and LaTeX tables.
+- [x] Promote the sampled-path generators for Tables 1--5 and remove their
+      dependency on untracked home-directory source files.
+- [x] Supersede the faulty archived edge-concentration, outdegree, and
+      edge-weight GraphML parsers with tested canonical implementations.
 
 ## Independent pre-release gates
 
@@ -34,6 +38,11 @@ items that depend on the two remaining Ricci computations.
       citation, release version, and release date to `CITATION.cff`.
 - [x] Run the corrected active-vertex directed-clustering implementation,
       review valid/total counts, and track the replacement manuscript table.
+- [ ] Re-aggregate Tables 1--5 with valid/total counts and track their final
+      LaTeX and aggregate source CSV files.
+- [ ] Rerun the corrected outdegree and edge-weight figure generators, compare
+      against the manuscript copies, and track the final aggregate data and
+      PNG/PDF files.
 
 ## Gates waiting only for the two Ricci computations
 
