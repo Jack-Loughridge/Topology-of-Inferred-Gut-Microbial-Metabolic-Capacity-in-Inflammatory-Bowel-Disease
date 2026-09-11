@@ -8,7 +8,8 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 > external-validation aggregate results, public-input provenance, and reference
 > database hashes are recorded. A clean-clone reconstruction of the modern
 > analysis environment and its resolved Linux/Python 3.10 lock are also recorded.
-> The remaining internal Ricci summaries,
+> The primary IBD Ricci feature-block ablation and its prediction-level audit
+> are now recorded. The remaining internal Ricci summaries,
 > immutable archive identifier, and preferred manuscript citation will be added
 > at the final result freeze.
 
@@ -21,6 +22,7 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 | Topological features | `pipeline/topology/` | Construct H0 persistence diagrams and faithful active-edge Ricci curvature features. |
 | Standalone H0 analyses | `analysis/h0_alpha_pi/` | Train-only adaptive H0 Alpha-Pi classification and sensitivity analyses. |
 | Standalone Ricci analyses | `analysis/ricci/` | Repeated participant-grouped Ricci classification and C-path analyses. |
+| Primary Ricci feature-block ablation | `analysis/ricci/ibd_block_ablation/` | Compare active-edge indicators, active-edge Ricci curvature, and their combined representation at the prespecified primary-task regularisation value. |
 | Joint H0-Ricci analyses | `analysis/joint/` | Nested participant-grouped sparse joint models with resolution-normalised alpha smoothness. |
 | Species benchmarks | `analysis/species/` | L1 logistic regression, random forest, and XGBoost comparators on species abundances. |
 | Interpretation | `analysis/interpretation/` | Generate coefficient, contribution, process, and manuscript-facing interpretation tables. |
@@ -69,7 +71,14 @@ The complete synthetic end-to-end suite is more computationally intensive:
 python run_checks.py full
 ```
 
-`static` verifies the 191-file production source manifest, citation and environment metadata, locked JSON configurations, Python and Bash syntax, and tracked-file hygiene. `unit` additionally runs graph-diagnostic, H0, and joint-model tests. `full` additionally runs all six data-free synthetic component self-tests. GitHub Actions runs the static and unit levels on pushes and pull requests; the full suite is available as a manually triggered workflow.
+`static` verifies the frozen 191-file production source manifest, the separate
+publication-stage Ricci-ablation source and result manifests, citation and
+environment metadata, locked JSON configurations, Python and Bash syntax, and
+tracked-file hygiene. `unit` additionally runs graph-diagnostic, H0, and
+joint-model tests. `full` additionally runs all seven data-free synthetic
+component self-tests. GitHub Actions runs the static and unit levels on pushes
+and pull requests; the full suite is available as a manually triggered
+workflow.
 
 ## Reproducibility
 
@@ -89,9 +98,15 @@ Production source files and locked configurations can also be checked directly w
 
 ```bash
 sha256sum -c provenance/source_import_manifest.sha256
+sha256sum -c provenance/ricci_ibd_feature_block_ablation/source_manifest_20260911.sha256
+sha256sum -c provenance/ricci_ibd_feature_block_ablation/result_manifest_20260911.sha256
 ```
 
-The source manifest records 191 files imported from the production Azure VM source freeze. Generated data, fitted checkpoints, caches, and large results are deliberately excluded from Git.
+The original source manifest records 191 files imported from the production
+Azure VM source freeze. The later Ricci feature-block ablation has separate
+source and result manifests so that the original freeze remains immutable.
+Generated data, fitted checkpoints, caches, identifier-bearing predictions,
+and large results are deliberately excluded from Git.
 
 ## Data and code availability
 

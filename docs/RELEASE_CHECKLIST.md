@@ -1,7 +1,7 @@
 # Publication release checklist
 
 This checklist separates repository work that is already complete from the
-items that depend on the two remaining Ricci computations.
+items that depend on the remaining Ricci computations.
 
 ## Complete
 
@@ -26,6 +26,9 @@ items that depend on the two remaining Ricci computations.
       dependency on untracked home-directory source files.
 - [x] Supersede the faulty archived edge-concentration, outdegree, and
       edge-weight GraphML parsers with tested canonical implementations.
+- [x] Complete and audit the primary IBD `B only` and `K0 only`
+      feature-block ablations at the prespecified `C=0.02`, retain compact
+      non-identifying results, and hash-lock their publication-stage source.
 
 ## Independent pre-release gates
 
@@ -44,7 +47,7 @@ items that depend on the two remaining Ricci computations.
       against the manuscript copies, and track the final aggregate data and
       PNG/PDF files.
 
-## Gates waiting only for the two Ricci computations
+## Gates waiting only for the remaining Ricci computations
 
 - [ ] Confirm every requested C-path has 100 completed outer folds and a valid
       run-completion marker.

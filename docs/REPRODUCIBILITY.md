@@ -22,7 +22,7 @@ python run_checks.py full
 
 - `static` verifies the production source manifest, citation and environment metadata, locked JSON configurations, canonical Python and Bash syntax, and tracked-file hygiene.
 - `unit` also executes the H0 Alpha-Pi and joint H0-Ricci pytest suites.
-- `full` also executes all six data-free synthetic component self-tests for H0, joint, Ricci, and species analyses.
+- `full` also executes all seven data-free synthetic component self-tests for H0, joint, Ricci, and species analyses, including the primary IBD Ricci feature-block ablation.
 
 For static checks alone, install PyYAML into Python 3.10 or later. For unit or full checks, create the modern environment described in `environment/README.md` and validate it first:
 
@@ -138,11 +138,21 @@ Every split must keep all samples from a participant on one side of each train/t
 | Standalone H0 IBD repeated analysis | `analysis/h0_alpha_pi/ibd_repeated_cv/` | Corrected train-only adaptive intervals using locked outer folds. |
 | Standalone H0 five-task analysis | `analysis/h0_alpha_pi/five_task_1x5/` | One locked five-fold repetition across the five tasks, with component-specific selection and refit safeguards. |
 | Ricci IBD C-path | `analysis/ricci/ibd_cpath/` | Five fixed C values over repeated participant-grouped folds. |
+| Ricci IBD feature-block ablation | `analysis/ricci/ibd_block_ablation/` | Prespecified `B only` and `K0 only` fits at `C=0.02`, using the combined model's byte-identical split manifests and otherwise identical classifier design. |
 | Ricci five-task repeated analysis | `analysis/ricci/five_task_repeated_cv/` | Locked repeated folds and faithful `[B | K0]` features. |
 | Joint H0-Ricci | `analysis/joint/core/` and `analysis/joint/repeated_cv/` | Three-fold grouped inner selection within repeated five-fold outer evaluation. |
 | Species benchmarks | `analysis/species/ibd_complete_case/` and `analysis/species/remaining_tasks/` | Train-only CLR, variance filtering, scaling, and fixed comparator models. |
 
 Each component contains its own README, validation command, test or self-test, launcher, expected completion marker, and output schema. Use the locked configuration JSON rather than relying on launcher defaults alone.
+
+The primary IBD feature-block ablation is a publication-stage addition and is
+therefore covered by separate source and result manifests under
+`provenance/ricci_ibd_feature_block_ablation/`, rather than by altering the
+frozen 191-file production import. Its prediction-level evidence was audited
+for complete out-of-fold coverage, zero participant overlap, exact
+sample-to-participant probability aggregation, convergence, and numerical
+reconstruction of every released summary and paired delta. Identifier-bearing
+prediction tables remain assigned to the permanent derived-results archive.
 
 ### 6. Run external validation
 
