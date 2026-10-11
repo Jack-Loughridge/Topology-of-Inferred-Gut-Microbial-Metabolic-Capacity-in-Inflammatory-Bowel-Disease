@@ -36,6 +36,7 @@ CANONICAL_SOURCE_ROOTS = (
 )
 
 UNIT_SUITES = (
+    ("current regularised joint v8 source and synthetic tests", ROOT / "analysis/joint/regularised_v8", ("run_tests.py",)),
     ("graph-input canonicalization unit tests", ROOT / "pipeline/graph_construction", ("-m", "pytest", "-q", "tests")),
     ("graph-diagnostics unit tests", ROOT / "analysis/graph_diagnostics", ("-m", "pytest", "-q", "tests")),
     ("H0 Alpha-Pi five-task unit tests", ROOT / "analysis/h0_alpha_pi/five_task_1x5", ("-m", "pytest", "-q", "tests")),
@@ -228,6 +229,7 @@ def validate_tracked_hygiene() -> None:
 def run_static_checks() -> None:
     verify_source_manifest()
     verify_supplementary_manifests()
+    subprocess.run([sys.executable, str(ROOT / "analysis/joint/verify_v8_release.py")], cwd=ROOT, check=True)
     validate_structured_metadata()
     validate_python_syntax()
     validate_shell_syntax()

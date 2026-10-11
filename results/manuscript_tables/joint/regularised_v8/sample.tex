@@ -1,0 +1,22 @@
+\begin{table}[!htbp]
+\centering\small
+\caption{\jointfinal{Exploratory regularised joint $H_0$ and Ricci performance for IBD versus non-IBD at sample level. The joint model used fixed requested $M=32$, $H_0$ ridge $0.001$ and Ricci $C=0.02$. The control used the same Ricci penalty and matched outer partitions. Values are mean $\pm$ sample SD across five repetitions.}}
+\label{tab:joint-v8-sample}
+\begingroup\bfseries\boldmath
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lrrr}
+\toprule
+Metric & Joint $H_0$ + Ricci & Matched Ricci & Mean difference \\
+\midrule
+Accuracy & $0.679 \pm 0.018$ & $0.677 \pm 0.029$ & $+0.002$ \\
+Balanced accuracy & $0.621 \pm 0.021$ & $0.605 \pm 0.037$ & $+0.017$ \\
+Macro $F_1$ & $0.614 \pm 0.021$ & $0.602 \pm 0.036$ & $+0.012$ \\
+ROC AUC & $0.662 \pm 0.030$ & $0.648 \pm 0.038$ & $+0.013$ \\
+Log loss & $0.645 \pm 0.037$ & $0.621 \pm 0.030$ & $+0.024$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip\begin{minipage}{0.98\linewidth}\footnotesize Each repetition includes the same 1,317 samples. Within each repetition, all five outer test folds are pooled. Differences are joint minus control. Lower log loss is better. Repetition variation is not uncertainty from independent cohorts. Historical SAGA results are not substituted for this matched control.
+\end{minipage}
+\endgroup
+\end{table}

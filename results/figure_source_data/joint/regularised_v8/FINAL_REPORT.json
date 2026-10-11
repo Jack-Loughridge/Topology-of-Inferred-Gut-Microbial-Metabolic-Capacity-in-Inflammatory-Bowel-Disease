@@ -1,0 +1,13 @@
+{
+  "all_fits_converged": true,
+  "analysis_complete": true,
+  "completed_pairs": 25,
+  "new_h0_ridge": 0.001,
+  "no_fold_omitted": true,
+  "no_results_selected_for_performance": true,
+  "optimisation_warnings": [],
+  "original_unpenalised_model": false,
+  "required_pairs": 25,
+  "schema": "joint-ibd-regularised-v8.0.0",
+  "status": "COMPLETE_ALL_CONVERGED"
+}

@@ -13,6 +13,12 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 > immutable archive identifier, and preferred manuscript citation will be added
 > at the final result freeze.
 
+## Completed joint v8 update
+
+The current joint result is the regularised primary-task comparison, not the historical five-task nested model. Its exact delivered package and non-identifying aggregates are committed with source/result manifests. All 25 joint fits and 25 matched controls reached the local numerical targets. Participant AUC improved modestly in all five repetitions, while sample log loss worsened in all five. See [the current joint entry point](analysis/joint/README.md), [the detailed map](docs/JOINT_V8_MANUSCRIPT_CODE_MAP.md), and [the compatibility audit and release gaps](docs/COMPATIBILITY_AUDIT_20261011.md).
+
+This publication branch is not yet the protected default main branch or an immutable release. A clean clone verifies source and aggregate results but does not supply the private original VM input/split provenance needed for full model reproduction.
+
 ## Study components
 
 | Component | Location | Purpose |
@@ -22,8 +28,8 @@ The workflow combines microbial species profiles with genome-scale metabolic rec
 | Topological features | `pipeline/topology/` | Construct H0 persistence diagrams and faithful active-edge Ricci curvature features. |
 | Standalone H0 analyses | `analysis/h0_alpha_pi/` | Train-only adaptive H0 Alpha-Pi classification and sensitivity analyses. |
 | Standalone Ricci analyses | `analysis/ricci/` | Repeated participant-grouped Ricci classification and C-path analyses. |
-| Primary Ricci feature-block ablation | `analysis/ricci/ibd_block_ablation/` | Compare active-edge indicators, active-edge Ricci curvature, and their combined representation at the prespecified primary-task regularisation value. |
-| Joint H0-Ricci analyses | `analysis/joint/` | Nested participant-grouped sparse joint models with resolution-normalised alpha smoothness. |
+| Primary Ricci feature-block ablation | `analysis/ricci/ibd_block_ablation/` | Compare finite-curvature availability indicators, zero-padded Ricci values, and their combination at the primary-task regularisation value. Actual active-edge presence is a distinct post hoc control. |
+| Final exploratory joint H0-Ricci analysis | `analysis/joint/run.py`; `analysis/joint/regularised_v8/` | Fixed M32 IBD comparison, five locked repetitions, Ricci C=0.02 and explicit H0 ridge=0.001. Historical nested implementations remain separately identified. |
 | Species benchmarks | `analysis/species/` | L1 logistic regression, random forest, and XGBoost comparators on species abundances. |
 | Interpretation | `analysis/interpretation/` | Generate coefficient, contribution, process, and manuscript-facing interpretation tables. |
 | External validation | `external_validation/serrano_gomez/` | Process the independent cohort and evaluate frozen-support and expanded-community representations. |
