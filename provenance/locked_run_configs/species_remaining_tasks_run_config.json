@@ -1,0 +1,64 @@
+{
+  "code_sha256": "1b6b012d68d438a5f4bf668addeecaf47f69577b4af1114ac7962fb42e17044e",
+  "created_utc": "2026-07-20T23:14:48.591028+00:00",
+  "input_sha256": {
+    "manifest_CD_vs_UC": "edd4d313e2afb6e7ec3c13690b049b0c01a603bc15b066c5ecbdb2124fb36ff3",
+    "manifest_IBD_vs_nonIBD": "2e8a71dd7d8c0946cc7da32d7e802690444581aba28cea941ecf88ae641938b5",
+    "manifest_nonIBD_vs_CD": "a76e2a1b561513412b2e57506de319878e1cb290f2e3768fd847a1f5938e8ddf",
+    "manifest_nonIBD_vs_UC": "9c7a88dd94e650dd35be2dc7154584c0b99e1db7b8e884120e0a2fdf261a44a0",
+    "manifest_three_way_nonIBD_UC_CD": "28d63bbb026fad9504f17f4afbe9b068971a2353c2ecfa226082a45d0b838387",
+    "species_file": "087a5bd0dd001906b348fdedd433d911edad73fef3bde5af47ca0a0fef5cee69"
+  },
+  "scientific_config": {
+    "base_seed": 20260720,
+    "calibration_bins": 10,
+    "code_version": "1.0.0",
+    "expected_folds": 5,
+    "expected_global_zero_profiles": 10,
+    "expected_repeats": 20,
+    "logistic_c": 0.2,
+    "logistic_max_iter": 10000,
+    "logistic_tol": 0.0001,
+    "model_order": [
+      "logistic_l1",
+      "random_forest",
+      "xgboost"
+    ],
+    "models": [
+      "logistic_l1",
+      "random_forest",
+      "xgboost"
+    ],
+    "pseudocount": 1e-06,
+    "rf_max_features": "sqrt",
+    "rf_min_samples_leaf": 3,
+    "rf_trees": 1000,
+    "schema_version": 1,
+    "species_file": "/home/Jack/Real_Data/Real_Species_Abundances_canon.xlsx",
+    "species_sheet": "Sheet1",
+    "split_dir": "/home/Jack/Real_Data/H0_Ricci_JointSparse_RepeatedCV_AllTasks/splits",
+    "task_order": [
+      "three_way_nonIBD_UC_CD",
+      "nonIBD_vs_UC",
+      "nonIBD_vs_CD",
+      "CD_vs_UC"
+    ],
+    "tasks": [
+      "three_way_nonIBD_UC_CD",
+      "nonIBD_vs_UC",
+      "nonIBD_vs_CD",
+      "CD_vs_UC"
+    ],
+    "variance_threshold": 0.0,
+    "weighting": "class_balanced",
+    "xgb_colsample_bytree": 0.85,
+    "xgb_estimators": 700,
+    "xgb_learning_rate": 0.02,
+    "xgb_max_depth": 3,
+    "xgb_reg_alpha": 0.25,
+    "xgb_reg_lambda": 2.0,
+    "xgb_subsample": 0.85,
+    "xgboost_weighting_rule": "balanced sample_weight only; scale_pos_weight=1.0 for binary"
+  },
+  "scientific_config_sha256": "3a629495f6b04aaade7317fa5e38dbc5453c3491fbc5d6e12264721973b880d4"
+}

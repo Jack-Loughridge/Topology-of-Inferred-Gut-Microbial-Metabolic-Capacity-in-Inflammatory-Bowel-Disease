@@ -1,0 +1,23 @@
+{
+  "corrected_v2_differs_from_historical_mean_policy": true,
+  "h0_sample_metrics_unchanged": true,
+  "h0_strict_participants_after": 78,
+  "h0_strict_participants_before": 79,
+  "h0_v2_participants_after": 154,
+  "status": "pass",
+  "strict_species_metrics_sha256": "157d41c3040557baddd839c60b49ace8419a5d151a22d0dcd745a07c296eed86",
+  "strict_species_metrics_unchanged": true,
+  "v2_paired_probability_crosscheck": {
+    "max_abs_difference_by_model": {
+      "logistic_l1": 1.1102230246251565e-16,
+      "random_forest": 1.1102230246251565e-16,
+      "xgboost": 1.1102230246251565e-16
+    },
+    "max_abs_difference_overall": 1.1102230246251565e-16,
+    "path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/structural_frozen_ibdmdb/external_species_benchmarks_ibd_vs_nonibd_last_occurrence_v1/sample_predictions_all_models.csv",
+    "rows_compared": 270,
+    "sha256": "35f8832a9c09afe22aee3489179d3f3282bacd94c00e3750f68667982a140e01",
+    "status": "pass",
+    "tolerance": 1e-12
+  }
+}

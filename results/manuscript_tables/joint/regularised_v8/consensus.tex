@@ -1,0 +1,19 @@
+\begin{table}[!htbp]
+\centering\small
+\caption{\jointfinal{Separate participant consensus results for the regularised joint comparison. Probabilities were averaged across repetitions before assigning one label per participant.}}
+\label{tab:joint-v8-consensus}
+\begingroup\bfseries\boldmath
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lrrrrrr}
+\toprule
+Model & TN & FP & FN & TP & Bal. acc. & AUC \\
+\midrule
+Joint & $16$ & $10$ & $16$ & $64$ & $0.708$ & $0.708$ \\
+Matched Ricci & $12$ & $14$ & $16$ & $64$ & $0.631$ & $0.690$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip\begin{minipage}{0.98\linewidth}\footnotesize TN and TP are correct non-IBD and IBD classifications. FP and FN are their respective errors. There are 26 non-IBD and 80 IBD participants. These consensus estimates do not replace the mean repetition results.
+\end{minipage}
+\endgroup
+\end{table}

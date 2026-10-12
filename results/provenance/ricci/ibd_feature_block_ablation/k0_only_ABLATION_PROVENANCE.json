@@ -1,0 +1,45 @@
+{
+  "convergence_warning_folds": 0,
+  "feature_count": 16932,
+  "fold_models": 100,
+  "folds_at_iteration_limit": 0,
+  "output_sha256": {
+    "feature_metadata": "24c42564a2cb07880e126fb58cab0053c4484ff2366ecfe504206748b610fa91",
+    "performance_summary": "683dae12e3af1a352661fa02ad4d155f6996969118828feae81ca9fd13db1e88",
+    "repetition_results": "27f45ad2c58539286364d5d64adf0612df4b51e6c231dbb8596840e01876c591",
+    "run_complete": "b0a601b4e94f18225b9719f37e82455c749a8b240b1c1e816c52f4061911fb00",
+    "run_config": "b3ae71b8d526c78dc048074b3b36454cf68b3f259a7abba6dae28021f7d350db"
+  },
+  "schema_version": 1,
+  "scientific_lock": {
+    "C": 0.02,
+    "canonical_engine_sha256": "88b4110b482cdde7d1a77803835ca3d5b8b414ee956c5987ce5acddeabb66682",
+    "classifier": "L1 LogisticRegression(solver=saga,class_weight=balanced)",
+    "coef_eps": 1e-12,
+    "combined_reference_run_config_sha256": "a99596297cce3949061e5e585c1b97df7ac9263d767b8510c3f5b58c8768c62d",
+    "feature_block": "K0",
+    "feature_definition": "K0_s(e)=Ricci curvature if edge e is active in sample s, otherwise 0",
+    "feature_input_sha256": {
+      "edge_metadata": "a3cb8e9b0f19677dbffdd5b8d6ca3119b14a06c6643d0781347872e6687936a3",
+      "feature_matrix_B_K0": "4eca6a4cdc2d6f408be9f3f8428a43bf5fe1d56c599e06a198c57827017b006b",
+      "matched_metadata": "deb3023d7162050f35ecab5a7a11789d336238720845dd3b9363fa7529386ca3"
+    },
+    "frozen_split_sha256": {
+      "participant_split_manifest.csv": "2a412a31f4c6bbfe28cdf53d8a42cb9017e5cc8e80aa55e947146d18478b366c",
+      "sample_split_manifest.csv": "b132c21bbb40ee5b094bb01d7541f7f5762edd34f0928f417a2e52af510d7b29",
+      "split_config.json": "661326905dea9e5e85293a30ba3e81e5337954c0e6a7db2bb3489e239fc34a52"
+    },
+    "max_iter": 10000,
+    "model_seed": 20260717,
+    "n_repeats": 20,
+    "n_splits": 5,
+    "participant_aggregation": "arithmetic mean of held-out sample probabilities within participant",
+    "preprocessing": "StandardScaler fit on each outer-training fold only",
+    "script_sha256": "e5b080b57874067422c858f35ddd517d2932e0559f65bd5f4c50fe8aa8033128",
+    "script_version": "1.0.0",
+    "split_seed": 13,
+    "tol": 0.0001
+  },
+  "script_version": "1.0.0",
+  "status": "complete"
+}

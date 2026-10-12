@@ -1,0 +1,51 @@
+{
+  "code_sha256": "caaaeabf7739864e93de24cfa817b69be857826b777632a4487e196c31f7d69b",
+  "created_utc": "2026-07-27T22:09:42.536778+00:00",
+  "input_sha256": {
+    "edge_metadata": "a3cb8e9b0f19677dbffdd5b8d6ca3119b14a06c6643d0781347872e6687936a3",
+    "feature_matrix": "4eca6a4cdc2d6f408be9f3f8428a43bf5fe1d56c599e06a198c57827017b006b",
+    "manifest_CD_vs_UC": "edd4d313e2afb6e7ec3c13690b049b0c01a603bc15b066c5ecbdb2124fb36ff3",
+    "manifest_IBD_vs_nonIBD": "2e8a71dd7d8c0946cc7da32d7e802690444581aba28cea941ecf88ae641938b5",
+    "manifest_nonIBD_vs_CD": "a76e2a1b561513412b2e57506de319878e1cb290f2e3768fd847a1f5938e8ddf",
+    "manifest_nonIBD_vs_UC": "9c7a88dd94e650dd35be2dc7154584c0b99e1db7b8e884120e0a2fdf261a44a0",
+    "manifest_three_way_nonIBD_UC_CD": "28d63bbb026fad9504f17f4afbe9b068971a2353c2ecfa226082a45d0b838387",
+    "matched_metadata": "deb3023d7162050f35ecab5a7a11789d336238720845dd3b9363fa7529386ca3"
+  },
+  "scientific_config": {
+    "base_model_seed": 20260721,
+    "c_values": [
+      0.005,
+      0.01,
+      0.02,
+      0.05,
+      0.1
+    ],
+    "classifier": "L1 LogisticRegression(solver=saga,class_weight=balanced)",
+    "code_version": "1.0.0",
+    "coef_eps": 1e-12,
+    "expected_folds": 5,
+    "expected_repeats": 20,
+    "feature_definition": "[B|K0] with active-edge presence B and active-edge Ricci curvature K0; absent K0=0",
+    "feature_dir": "/home/Jack/Real_Data/Ricci_Classifier_Faithful_Eps0001_n250_v3",
+    "max_iter": 10000,
+    "preprocessing": "StandardScaler fit on each outer-training fold only",
+    "schema_version": 1,
+    "split_dir": "/home/Jack/Real_Data/H0_Ricci_JointSparse_RepeatedCV_AllTasks/splits",
+    "task_order": [
+      "IBD_vs_nonIBD",
+      "three_way_nonIBD_UC_CD",
+      "nonIBD_vs_UC",
+      "nonIBD_vs_CD",
+      "CD_vs_UC"
+    ],
+    "tasks": [
+      "three_way_nonIBD_UC_CD",
+      "nonIBD_vs_UC",
+      "nonIBD_vs_CD",
+      "CD_vs_UC"
+    ],
+    "tol": 0.0001,
+    "top_n": 100
+  },
+  "scientific_config_sha256": "b5f2a96fc4ab37849c82c63c4687eea870f9966d2b83ad7ece36a139c396d258"
+}

@@ -1,0 +1,13 @@
+# Runtime scaffold only: MetaPhlAn 2.6.0 was a standalone historical script.
+# Do not add a modern metaphlan package to this environment.
+name: tda-ibd-metaphlan2-v260
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.10
+  - bowtie2
+  - numpy
+  - biom-format
+  - pip

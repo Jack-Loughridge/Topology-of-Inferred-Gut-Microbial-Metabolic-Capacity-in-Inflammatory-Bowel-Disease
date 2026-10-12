@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{External IBD-versus-non-IBD performance of the frozen five-model H$_0$ Alpha--Pi ensemble.}
+\label{tab:external_h0_alphapi}
+\begin{tabular}{lllrrrrrrrr}
+\toprule
+Representation & Role & Unit & $n$ & Acc. & Bal. acc. & Macro F1 & ROC--AUC & AP$_{\mathrm{IBD}}$ & Rec. nonIBD & Rec. IBD \\
+\midrule
+v1 frozen support & Strict external & Sample & 90 & 0.267 & 0.401 & 0.258 & 0.353 & 0.820 & 0.583 & 0.218 \\
+v1 frozen support & Strict external & Participant & 78 & 0.295 & 0.413 & 0.285 & 0.360 & 0.798 & 0.583 & 0.242 \\
+v2 expanded community & Exploratory replication & Sample & 184 & 0.424 & 0.582 & 0.378 & 0.585 & 0.939 & 0.778 & 0.386 \\
+v2 expanded community & Exploratory replication & Participant & 154 & 0.435 & 0.584 & 0.396 & 0.587 & 0.927 & 0.778 & 0.390 \\
+v2 on paired v1 samples & Exploratory paired & Sample & 90 & 0.456 & 0.651 & 0.430 & 0.625 & 0.933 & 0.917 & 0.385 \\
+\bottomrule
+\end{tabular}
+\begin{minipage}{0.98\linewidth}
+\footnotesize
+Probabilities are the unweighted mean of five corrected outer-training models, each using its own train-only adaptive interval bounds. Participant probabilities are grouped by host subject whenever that field is available. The v1 representation is the strict frozen-support external analysis. The v2 representation uses external-cohort support normalization and is therefore an exploratory structural replication, not a second strict external validation. AP denotes average precision for IBD.
+\end{minipage}
+\end{table}

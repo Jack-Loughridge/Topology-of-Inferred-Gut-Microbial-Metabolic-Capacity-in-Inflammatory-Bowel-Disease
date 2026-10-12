@@ -1,0 +1,55 @@
+name: Publish and verify completed joint v8
+on:
+  push:
+    branches: [publication/joint-v8-final-20261011]
+    paths: ['provenance/joint_v8/deploy/**', '.github/workflows/joint-v8-approved.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  approved-code:
+    if: github.ref == 'refs/heads/publication/joint-v8-final-20261011'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.10'
+      - name: Check unchanged publication baseline and apply exact overlay
+        run: |
+          test "$(git rev-parse origin/publication/rebuild-2026)" = 'effc7bf0661cbf36dda4ed82c44a54a455ad60a4'
+          python provenance/joint_v8/deploy/apply.py
+      - name: Install verification environment only
+        run: python -m pip install numpy==2.2.6 pandas==2.3.3 scipy==1.15.3 scikit-learn==1.7.2 PyYAML pytest
+      - name: Check source, aggregates and repository integrity
+        env:
+          OPENBLAS_NUM_THREADS: '1'
+          OMP_NUM_THREADS: '1'
+        run: |
+          python run_checks.py static | tee provenance/joint_v8/REPOSITORY_STATIC_CHECKS.log
+          python analysis/joint/regularised_v8/run_tests.py > provenance/joint_v8/V8_TESTS.log 2>&1
+          python analysis/joint/make_v8_manuscript_tables.py results/figure_source_data/joint/regularised_v8 /tmp/v8-tables
+          diff -r /tmp/v8-tables results/manuscript_tables/joint/regularised_v8
+          python provenance/joint_v8/repository_inventory.py
+      - name: Commit verified current source and aggregates to review branch only
+        run: |
+          git fetch origin publication/rebuild-2026
+          test "$(git rev-parse origin/publication/rebuild-2026)" = 'effc7bf0661cbf36dda4ed82c44a54a455ad60a4'
+          test "$(git branch --show-current)" = 'publication/joint-v8-final-20261011'
+          git config user.name 'Verified publication update'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analysis/joint docs environment/requirements-joint-v8-py310.txt provenance/joint_v8 results/figure_source_data/joint/regularised_v8 results/manuscript_tables/joint/regularised_v8 README.md run_checks.py
+          git add -f provenance/joint_v8/REPOSITORY_STATIC_CHECKS.log provenance/joint_v8/V8_TESTS.log
+          git commit -m 'Publish exact successful v8 joint model, checked aggregates and compatibility audit'
+          git push origin HEAD:publication/joint-v8-final-20261011
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: joint-v8-code-verification
+          path: |
+            provenance/joint_v8/*.json
+            provenance/joint_v8/*.md
+            provenance/joint_v8/*.log

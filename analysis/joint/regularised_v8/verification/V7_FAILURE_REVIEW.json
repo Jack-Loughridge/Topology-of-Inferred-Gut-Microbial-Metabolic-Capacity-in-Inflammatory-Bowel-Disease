@@ -1,0 +1,31 @@
+{
+  "archive_sha256": "f74a3effd75e8ff2fc0fcb4dcbe612d7916a98de5b65f35f8abdf5d2f9dd3061",
+  "sidecar_matches": true,
+  "payload_entries": 15,
+  "all_payload_checksums_match": true,
+  "outcome": {
+    "accepted_joint": 0,
+    "accepted_ricci": 0,
+    "analysis_complete": false,
+    "expected_pairs": 25,
+    "failure": {
+      "job": "jobs/IBD_vs_nonIBD/repeat_01/fold_1/joint",
+      "message": "Training stability was not confirmed; candidate is not scored.",
+      "requested_M": 32,
+      "role": "joint_outer",
+      "status": "NUMERICAL_FAILURE",
+      "task": "IBD_vs_nonIBD"
+    },
+    "historical_results_overwritten": false,
+    "id": "7f1262d5d6523749e0947ac4c632d91d325654c15f0c16ab65d349ffe0aceade",
+    "inner_fits": 0,
+    "partial_results_in_main_tables": false,
+    "repetition_SD_is_not_independent_cohort_uncertainty": true,
+    "repetitions": 5,
+    "requested_M": 32,
+    "resolution_selected": false,
+    "status": "STOPPED_AT_FAILED_JOB",
+    "task": "IBD_vs_nonIBD"
+  },
+  "limits": "The review archive has no detailed failed-outer history or parameter arrays. The specific late optimisation trajectory is not inferred."
+}

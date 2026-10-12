@@ -1,0 +1,12 @@
+PACKAGE VERIFIED 52d1a5d946f06842f47f45ec947f6f9682634e0ef94c31474b8d92e16ce94661
+PASS: exact v8 source, 50 converged records, all aggregate means/SDs, paired differences and confusion metrics
+Boundary: raw prediction ranks, production gradients, exact executed VM source manifest and split membership are not in this export.
+OK: source manifest (191 files)
+OK: Ricci IBD feature-block ablation source manifest (5 files)
+OK: Ricci IBD feature-block ablation result manifest (28 files)
+OK: citation, 3 environment YAML files, and 19 locked JSON configurations
+OK: Python syntax (142 files)
+OK: Bash syntax (27 files)
+OK: tracked-file hygiene (417 files)
+
+PASS: repository static checks

@@ -1,0 +1,173 @@
+{
+  "logistic_l1": {
+    "model_label": "Species L1 logistic",
+    "participant_probability_averaged": {
+      "accuracy": 0.7272727272727273,
+      "average_precision_ibd": 0.9544671860123388,
+      "balanced_accuracy": 0.6045751633986928,
+      "brier": 0.17914488535723236,
+      "class_counts": {
+        "IBD": 136,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          8,
+          10
+        ],
+        [
+          32,
+          104
+        ]
+      ],
+      "log_loss": 0.5713617589783703,
+      "macro_f1": 0.5539310344827586,
+      "n": 154,
+      "recall_IBD": 0.7647058823529411,
+      "recall_nonIBD": 0.4444444444444444,
+      "roc_auc": 0.7238562091503268,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.7445652173913043,
+      "average_precision_ibd": 0.9647010184021789,
+      "balanced_accuracy": 0.6107764390896921,
+      "brier": 0.16868952892420985,
+      "class_counts": {
+        "IBD": 166,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          8,
+          10
+        ],
+        [
+          37,
+          129
+        ]
+      ],
+      "log_loss": 0.544992953539894,
+      "macro_f1": 0.5499349466562582,
+      "n": 184,
+      "recall_IBD": 0.7771084337349398,
+      "recall_nonIBD": 0.4444444444444444,
+      "roc_auc": 0.7366131191432396,
+      "threshold": 0.5
+    }
+  },
+  "random_forest": {
+    "model_label": "Species random forest",
+    "participant_probability_averaged": {
+      "accuracy": 0.8831168831168831,
+      "average_precision_ibd": 0.926219676614945,
+      "balanced_accuracy": 0.5,
+      "brier": 0.09847549084781732,
+      "class_counts": {
+        "IBD": 136,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          0,
+          18
+        ],
+        [
+          0,
+          136
+        ]
+      ],
+      "log_loss": 0.3470571832682382,
+      "macro_f1": 0.4689655172413793,
+      "n": 154,
+      "recall_IBD": 1.0,
+      "recall_nonIBD": 0.0,
+      "roc_auc": 0.6605392156862746,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.9021739130434783,
+      "average_precision_ibd": 0.9398998679892006,
+      "balanced_accuracy": 0.5,
+      "brier": 0.08565219278882422,
+      "class_counts": {
+        "IBD": 166,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          0,
+          18
+        ],
+        [
+          0,
+          166
+        ]
+      ],
+      "log_loss": 0.3126124665205731,
+      "macro_f1": 0.4742857142857143,
+      "n": 184,
+      "recall_IBD": 1.0,
+      "recall_nonIBD": 0.0,
+      "roc_auc": 0.6706827309236948,
+      "threshold": 0.5
+    }
+  },
+  "xgboost": {
+    "model_label": "Species XGBoost",
+    "participant_probability_averaged": {
+      "accuracy": 0.8831168831168831,
+      "average_precision_ibd": 0.9436457719732181,
+      "balanced_accuracy": 0.6205065359477124,
+      "brier": 0.10259167196885473,
+      "class_counts": {
+        "IBD": 136,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          5,
+          13
+        ],
+        [
+          5,
+          131
+        ]
+      ],
+      "log_loss": 0.3481151056646328,
+      "macro_f1": 0.6464285714285715,
+      "n": 154,
+      "recall_IBD": 0.9632352941176471,
+      "recall_nonIBD": 0.2777777777777778,
+      "roc_auc": 0.7205882352941176,
+      "threshold": 0.5
+    },
+    "sample": {
+      "accuracy": 0.8913043478260869,
+      "average_precision_ibd": 0.9559652023119258,
+      "balanced_accuracy": 0.6178045515394913,
+      "brier": 0.09092660856010004,
+      "class_counts": {
+        "IBD": 166,
+        "nonIBD": 18
+      },
+      "confusion_matrix": [
+        [
+          5,
+          13
+        ],
+        [
+          7,
+          159
+        ]
+      ],
+      "log_loss": 0.31509437146113484,
+      "macro_f1": 0.6370808678500987,
+      "n": 184,
+      "recall_IBD": 0.9578313253012049,
+      "recall_nonIBD": 0.2777777777777778,
+      "roc_auc": 0.7325970548862115,
+      "threshold": 0.5
+    }
+  }
+}

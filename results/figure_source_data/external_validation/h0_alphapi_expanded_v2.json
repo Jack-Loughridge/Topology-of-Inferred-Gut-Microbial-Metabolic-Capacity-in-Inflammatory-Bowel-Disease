@@ -1,0 +1,73 @@
+{
+  "fold_disagreement": {
+    "sample_probability_sd_population_max": 0.1784241591596619,
+    "sample_probability_sd_population_mean": 0.06593800703431175,
+    "sample_probability_sd_population_median": 0.06118153485325742
+  },
+  "metadata_audit": {
+    "label_column": "external_label_ibd_binary",
+    "metadata_sha256": "79f8a624b13fbaa949d3f6cb7660d093b2f3b848442f4d54232810ba42dd5774",
+    "participant_columns_considered_in_order": [
+      "host_subject_id",
+      "patient_id",
+      "subject_id"
+    ],
+    "sample_key": "sample_id_v2"
+  },
+  "methodological_role": "exploratory structural replication",
+  "participant_probability_averaged": {
+    "accuracy": 0.43506493506493504,
+    "average_precision_ibd": 0.9274985701618832,
+    "balanced_accuracy": 0.5837418300653595,
+    "brier": 0.2890035780124102,
+    "class_counts": {
+      "IBD": 136,
+      "nonIBD": 18
+    },
+    "confusion_matrix": [
+      [
+        14,
+        4
+      ],
+      [
+        83,
+        53
+      ]
+    ],
+    "log_loss": 0.7772032102314104,
+    "macro_f1": 0.3963505293985132,
+    "n": 154,
+    "recall_IBD": 0.3897058823529412,
+    "recall_nonIBD": 0.7777777777777778,
+    "roc_auc": 0.5866013071895425,
+    "threshold": 0.5
+  },
+  "representation": "Expanded-community H0",
+  "sample": {
+    "accuracy": 0.42391304347826086,
+    "average_precision_ibd": 0.9387131850143168,
+    "balanced_accuracy": 0.5816599732262383,
+    "brier": 0.2930051674984576,
+    "class_counts": {
+      "IBD": 166,
+      "nonIBD": 18
+    },
+    "confusion_matrix": [
+      [
+        14,
+        4
+      ],
+      [
+        102,
+        64
+      ]
+    ],
+    "log_loss": 0.7862226759947532,
+    "macro_f1": 0.377981885444572,
+    "n": 184,
+    "recall_IBD": 0.3855421686746988,
+    "recall_nonIBD": 0.7777777777777778,
+    "roc_auc": 0.5853413654618475,
+    "threshold": 0.5
+  }
+}

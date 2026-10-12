@@ -1,0 +1,14 @@
+{
+  "completed_utc": "2026-09-03T09:21:03.528466+00:00",
+  "models": [
+    "logistic_l1",
+    "random_forest",
+    "xgboost"
+  ],
+  "participant_predictions_per_model": 78,
+  "sample_predictions_per_model": 90,
+  "script_sha256": "9424055ecef397aafc14a695b33018bc84d7e737c74c34a006c8f43f1a308e24",
+  "script_version": "1.1.0",
+  "status": "complete",
+  "task": "IBD_vs_nonIBD"
+}

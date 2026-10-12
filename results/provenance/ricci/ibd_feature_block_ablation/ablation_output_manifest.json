@@ -1,0 +1,9 @@
+{
+  "sha256": {
+    "ABLATION_RUN_COMPLETE.json": "89ad6adb5e5dfd24bb415afbd4df6ceb98ab120c0037896af182b5dc9afbdc97",
+    "ablation_paired_deltas.csv": "39ee77dd94603333e8c6ce73ae1e48e9367343ad272f81816050159c11897e18",
+    "ablation_performance_summary.csv": "c79188f73b10ac8b50fec5f60e92892f0a273f6a263fa6dcfbc813a6f9316f8e",
+    "ablation_repetition_metrics_long.csv": "eee9831e0b5bf3771311cd1a8071a6fd4e9dcb63a1d66b93891483466c850af7",
+    "ricci_feature_block_ablation.tex": "8562a61022a9e36faa64fb48b6ffb231c83d5977e7e83a2df8ca8a63b732470a"
+  }
+}

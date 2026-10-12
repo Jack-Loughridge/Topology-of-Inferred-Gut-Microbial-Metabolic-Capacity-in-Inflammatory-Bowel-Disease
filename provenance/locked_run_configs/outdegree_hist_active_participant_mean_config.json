@@ -1,0 +1,11 @@
+{
+  "graph_dir": "/home/Jack/Real_Data/out_graphs",
+  "metadata": "/home/Jack/Real_Data/hmp2_metadata.csv",
+  "output_dir": "/home/Jack/Real_Data/Outdegree_ParticipantAverage_Corrected_20260911",
+  "active_tol": 1e-12,
+  "sd_ddof": 0,
+  "expected_samples": 1317,
+  "expected_participants": 106,
+  "aggregation": "sample histogram -> participant mean -> condition mean and population SD",
+  "empty_graph_policy": "an empty active graph contributes a zero histogram"
+}

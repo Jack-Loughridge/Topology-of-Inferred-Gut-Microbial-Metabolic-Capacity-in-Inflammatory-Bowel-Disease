@@ -1,0 +1,10 @@
+component	observed_runtime_version	conda_metadata_version	conda_build	executable_sha256	note
+Python	3.12.13	3.12.13	hd63d673_0_cpython		Micromamba environment interpreter
+HUMAnN	3.9	3.9	py312hdfd78af_0		Current external functional-profiling workflow
+KneadData	0.12.4	0.12.4	pyhdfd78af_0		External host-read preprocessing
+MetaPhlAn	4.0.6	4.0.6	pyhca03a8a_0		HUMAnN prescreen; database index mpa_vJun23_CHOCOPhlAnSGB_202307
+Bowtie2	2.5.5	2.5.5	ha27dd3b_0		Runtime confirmed from bowtie2-align-s
+DIAMOND	2.0.15	2.2.2	he361c42_0	edf54a3ed21e0c2348b916d3c794f794097176c30e4fb5c32bc3ec3cfde6e6a2	Runtime/metadata discrepancy retained explicitly
+biom-format		2.1.17	py312h5253ce2_1		Conda metadata observation
+NumPy		2.5.0	py312h33ff503_0		Conda metadata observation
+pandas		3.0.3	py312h8ecdadd_0		Conda metadata observation

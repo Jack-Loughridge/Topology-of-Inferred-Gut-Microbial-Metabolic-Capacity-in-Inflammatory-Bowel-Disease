@@ -1,0 +1,38 @@
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+# Logs and generated analyses
+*.log
+Species_Benchmarks_RepeatedCV_IBD/
+output/
+outputs/
+results/
+figures/
+folds/
+full_source_models/
+partial_progress/
+*.joblib
+*.pkl
+*.pickle
+
+# Local source data
+*.xlsx
+*.xls
+sample_labels.csv
+hmp2_metadata.csv
+sample_split_manifest.csv
+Real_Data/
+out_pds/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+Species_Benchmarks_RepeatedCV_IBD_CompleteCase/

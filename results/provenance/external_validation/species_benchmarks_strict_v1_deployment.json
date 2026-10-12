@@ -1,0 +1,89 @@
+{
+  "analysis": "Serrano-Gomez structural-frozen-IBDMDB v1 external species benchmarks using last-occurrence duplicate resolution",
+  "benchmark_artifact_layout": "legacy_ibd_complete_case_v1_1",
+  "class_order": [
+    "nonIBD",
+    "IBD"
+  ],
+  "completed_utc": "2026-09-03T09:21:03.525269+00:00",
+  "external_metadata": {
+    "path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/structural_frozen_ibdmdb/ricci_features_frozen_training_order/matched_metadata.csv",
+    "sha256": "12e40b52d0aba0add403567955e02759b298d9b7cc2a6746ee3e0bb39b42b85d"
+  },
+  "external_participants": 78,
+  "external_samples": 90,
+  "frozen_preprocessor": {
+    "input_species_coordinates": 508,
+    "pseudocount": 1e-06,
+    "variance_selected_coordinates": 508,
+    "variance_threshold": 1e-10
+  },
+  "leakage_control": "External labels were not read until frozen probabilities from all three models had been computed. Labels were not used for taxon mapping, vectorization, CLR, variance selection, scaling, fitting, calibration, model selection, or threshold selection.",
+  "minimum_mapped_fraction_required": 0.0,
+  "models": {
+    "logistic_l1": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/logistic_l1/full_source_model.joblib",
+      "artifact_sha256": "e95e59b49e9246c7a81f290e427f186649a422975c4d55ff97effd1cad9a1b06",
+      "label": "Species L1 logistic",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/logistic_l1/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "14bcd14074f1613975427d9ea497de7bb7882bbd8f5777514f338a969a13c560"
+    },
+    "random_forest": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/random_forest/full_source_model.joblib",
+      "artifact_sha256": "4e4d66f95883fca332bf7cf48b20b78c0040b34c504c2fb3b3fedcb611732cb5",
+      "label": "Species random forest",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/random_forest/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "3a1b112e888d4ad289cdcf3d30e352792bc3ca1d4c5c0995100fedb185f3609d"
+    },
+    "xgboost": {
+      "artifact_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/xgboost/full_source_model.joblib",
+      "artifact_sha256": "ede49edfbe7de238685de5bf598648295a8639a39e48d7aba0a24f8aaf4bb714",
+      "label": "Species XGBoost",
+      "marker_path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/full_source_models/xgboost/FULL_MODEL_COMPLETE.json",
+      "marker_sha256": "76a1ffff966b07a5c8606cef0cffa4e79f7238b41f8c45d94c75ca63d99e0108"
+    }
+  },
+  "participant_identifier": "host_subject_id",
+  "participant_prediction_rule": "arithmetic mean of frozen sample probabilities, then threshold 0.5",
+  "script_path": "REPOSITORY_ROOT/external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_ibd_last_occurrence_v1.py",
+  "script_sha256": "9424055ecef397aafc14a695b33018bc84d7e737c74c34a006c8f43f1a308e24",
+  "script_version": "1.1.0",
+  "source_abundance_scale": {
+    "external_abundance_multiplier": 1.0,
+    "scale_rule": "source rows are percentage-scale; retain external abundance_percent",
+    "source_row_sum_max": 200.0,
+    "source_row_sum_median": 101.74383,
+    "source_row_sum_min": 99.99996999999999
+  },
+  "source_design_summary": {
+    "path": "DATA_ROOT/Species_Benchmarks_RepeatedCV_IBD_LastOccurrence/input_and_design_summary.json",
+    "sha256": "6c9b298e2c46d025b45f9a01540d36cb05a00d326910f76422c6b4da8a8e20f0"
+  },
+  "structural_mapper": {
+    "frozen_axis_audit": {
+      "exact_order_match_to_benchmark": true,
+      "n_species": 508,
+      "training_scale_statistics": {
+        "n_samples": 1360,
+        "n_species": 508,
+        "row_sum_max": 200.0,
+        "row_sum_median": 101.71129499999998,
+        "row_sum_min": 0.0,
+        "row_sum_q05": 100.00000000000001,
+        "row_sum_q95": 114.52445999999999
+      },
+      "training_species_path": "DATA_ROOT/Real_Species_Abundances_canon.xlsx",
+      "training_species_sha256": "087a5bd0dd001906b348fdedd433d911edad73fef3bde5af47ca0a0fef5cee69"
+    },
+    "functions_reused": [
+      "parse_metaphlan_species",
+      "profile_filename_score",
+      "build_species_key_map",
+      "project_external_species"
+    ],
+    "source_path": "DATA_ROOT/external_validation/serrano_gomez_ibd/ge50_external_validation/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+    "source_sha256": "d1f9758ce24a235915c4ae6be6bb9e57fc274a9da48eab6aaf47b528dea6f863"
+  },
+  "task": "IBD_vs_nonIBD",
+  "threshold": 0.5
+}

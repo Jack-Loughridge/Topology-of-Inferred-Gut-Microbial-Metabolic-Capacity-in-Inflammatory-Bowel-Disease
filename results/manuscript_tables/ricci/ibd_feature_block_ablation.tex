@@ -1,0 +1,22 @@
+\begin{table}[htbp]
+\centering
+\small
+\caption{Prespecified feature-block ablation for IBD versus non-IBD classification at $C=0.02$.}
+\label{tab:ricci_feature_block_ablation}
+\begin{tabular}{llcccc}
+\toprule
+Representation & Unit & Accuracy & Balanced accuracy & Macro F1 & ROC--AUC \\
+\midrule
+B only & Sample & 0.679 $\pm$ 0.024 & 0.624 $\pm$ 0.028 & 0.616 $\pm$ 0.027 & 0.662 $\pm$ 0.033 \\
+B only & Participant & 0.710 $\pm$ 0.020 & 0.642 $\pm$ 0.027 & 0.631 $\pm$ 0.025 & 0.684 $\pm$ 0.037 \\
+$K_0$ only & Sample & 0.711 $\pm$ 0.021 & 0.640 $\pm$ 0.022 & 0.639 $\pm$ 0.022 & 0.686 $\pm$ 0.028 \\
+$K_0$ only & Participant & 0.751 $\pm$ 0.035 & 0.673 $\pm$ 0.045 & 0.670 $\pm$ 0.045 & 0.710 $\pm$ 0.028 \\
+$[B\mid K_0]$ & Sample & 0.695 $\pm$ 0.021 & 0.630 $\pm$ 0.024 & 0.626 $\pm$ 0.024 & 0.672 $\pm$ 0.027 \\
+$[B\mid K_0]$ & Participant & 0.735 $\pm$ 0.030 & 0.666 $\pm$ 0.039 & 0.658 $\pm$ 0.037 & 0.695 $\pm$ 0.029 \\
+\bottomrule
+\end{tabular}
+\begin{minipage}{0.96\linewidth}
+\footnotesize
+Values are mean $\pm$ standard deviation across 20 pooled out-of-fold repetition estimates. All representations use the same participant-grouped folds, training-fold-only standardisation, L1 logistic regression, class weighting, regularisation value and model seeds. The standard deviations describe sensitivity to the repeated partitions and are not confidence intervals from independent cohorts.
+\end{minipage}
+\end{table}

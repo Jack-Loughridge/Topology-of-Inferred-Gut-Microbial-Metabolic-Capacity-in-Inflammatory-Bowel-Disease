@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.log
+*.tmp
+.DS_Store
+
+# Data and generated analysis outputs
+*.xlsx
+*.xls
+*.csv.gz
+folds/
+full_source_models/
+plots/
+Species_Benchmarks_RepeatedCV_*/
+RUN_COMPLETE.json
+progress.json
+run_config.json

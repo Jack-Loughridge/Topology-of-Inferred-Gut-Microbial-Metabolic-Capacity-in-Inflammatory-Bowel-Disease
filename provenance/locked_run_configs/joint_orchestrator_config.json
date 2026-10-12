@@ -1,0 +1,81 @@
+{
+  "joint_repo": "/home/Jack/Real_Data/h0_ricci_joint_sparse",
+  "ibd_split_manifest": "/home/Jack/Real_Data/Ricci_IBD_RepeatedCV_CPath/splits/sample_split_manifest.csv",
+  "h0_results_dir": "/home/Jack/Real_Data/H0_AlphaPi_NestedQ_TrainOnlyBins",
+  "h0_pd_dir": "/home/Jack/Real_Data/out_pds",
+  "ricci_original_dir": "/home/Jack/Real_Data/Ricci_Classifier_OriginalStyle_AllTasks_NewVectors",
+  "ricci_feature_dir": "/home/Jack/Real_Data/Ricci_Classifier_Faithful_Eps0001_n250_v3",
+  "output_dir": "/home/Jack/Real_Data/H0_Ricci_JointSparse_RepeatedCV_AllTasks",
+  "expected_repeats": 20,
+  "expected_folds": 5,
+  "n_inner_splits": 3,
+  "selection_metric": "roc_auc",
+  "interval_grid": [
+    64,
+    96,
+    160
+  ],
+  "lambda_h0_grid": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "lambda_ricci_grid": [
+    0.5,
+    1.0,
+    2.0
+  ],
+  "c_value": 0.02,
+  "alpha_smoothness_gamma": 0.01,
+  "alpha_smoothness_reference_intervals": 160,
+  "logistic_max_iter": 24000,
+  "logistic_tolerance": 0.0001,
+  "active_set_initial": 512,
+  "active_set_batch": 512,
+  "active_set_max_rounds": 100,
+  "alternations": 6,
+  "quad_points": 5,
+  "task_order": [
+    "IBD_vs_nonIBD",
+    "three_way_nonIBD_UC_CD",
+    "nonIBD_vs_UC",
+    "nonIBD_vs_CD",
+    "CD_vs_UC"
+  ],
+  "schema_version": "h0-ricci-joint-all-tasks-repeated-cv-v2",
+  "code_version": "2.0.1",
+  "source_lock": {
+    "locked_ibd_manifest_sha256": "b132c21bbb40ee5b094bb01d7541f7f5762edd34f0928f417a2e52af510d7b29",
+    "core_source_fingerprints": {
+      "pyproject.toml": "6560eec9b6a4fee97a99adbd219a6520af3f8e0d8bceac25d88663ad5aa52fef",
+      "scripts/run_joint_sparse.py": "2c93525d198172cd69519c9865e98a3b414bbcc983351d531a7b53cce71eaf85",
+      "src/h0_ricci_joint_sparse/data.py": "b96cd0752e25dab7eb8d521c46969dcafd2d1b4d69d1992789e447e231d6edb3",
+      "src/h0_ricci_joint_sparse/tasks.py": "ae52582babb9f38466fafaa2c60dbecfc141bfb5c1ee5e80fdaaa26faf32df86",
+      "src/h0_ricci_joint_sparse/wkpi.py": "c03b3d61fbc3161165ff0ba4ac3e2b24cf36bf7d92d4dbf752d5ec16a3b847f1",
+      "src/h0_ricci_joint_sparse/model.py": "fc6d0a8ec94172900c9ac25e431e5dfb601f0eddf0674c4f389c0993d6d0a230",
+      "src/h0_ricci_joint_sparse/cv.py": "b747d256f03cfff89c3eb1c48f8b2623c45cd1093cfcba7e6175faedacdfe9a5",
+      "src/h0_ricci_joint_sparse/metrics.py": "011d3ae8d3ed5705132e0d4c9f6ed766a58a7fac1e02ed155538aa4aad65c267",
+      "src/h0_ricci_joint_sparse/outputs.py": "f94cede6e105992a95bb53e544bd9679342aa286e78c922ef04f5b60cd7d2aa2"
+    },
+    "orchestrator_source_fingerprints": {
+      "joint_repeated_cv/__init__.py": "ba5ebce0a50e598388a16f3c5c989dd7ed3202b6f52d0e83bf89882c93a2c948",
+      "joint_repeated_cv/aggregate.py": "76bc9d9c13b0bbfdf64e5368c4a2952b0804e82b86c43e0453dd091dca37fee5",
+      "joint_repeated_cv/cli.py": "2fc58f242a050b77898c4b48fb6f4d8adb1387332828f4cfa433fbfc0619649a",
+      "joint_repeated_cv/config.py": "1307d898c3fc93c7904c2adefb03b167cd4476374892547ca50ee2c077d4d631",
+      "joint_repeated_cv/core.py": "7a6353cedf84e1855e851311feb15972a33e49082c20dc91b8d9ea3a8e8a0b5c",
+      "joint_repeated_cv/metrics.py": "18820c6f64eb1eb871f0ece1e72f899aa5351b1737a61345e25512fcbd9700b9",
+      "joint_repeated_cv/orchestrator.py": "ed9a3d4c3416f0aca1d1aa4aa8fc19044d19a7c8d5a09c1e24c4562f2bc40528",
+      "joint_repeated_cv/splits.py": "7c6932d98041623a6ebeb196c616039cef818f33cfc2aac6587dbe52b6f83cf1",
+      "joint_repeated_cv/tasks.py": "d175d299b40c661797ed7595877badcc8230508c1f2ef6e3efbbaba1ad052782",
+      "joint_repeated_cv/util.py": "83c91d408e0051dae7cee5d8785c8d706ba3e4ca096ea7cf471e1f8116d12e9c"
+    },
+    "core_patch_identity": {
+      "patch": "ALPHA_SMOOTHNESS_RESOLUTION_NORMALISATION_V1",
+      "reference_intervals": 160,
+      "formula": "gamma_eff(M) = gamma * (M - 1) / (160 - 1)",
+      "original_model_sha256": "b0eff25de9bf1400d5d1e3a5d3576ba1233ffdeda3420596cf24de65ed8e8e8e",
+      "patched_model_sha256": "fc6d0a8ec94172900c9ac25e431e5dfb601f0eddf0674c4f389c0993d6d0a230"
+    }
+  }
+}

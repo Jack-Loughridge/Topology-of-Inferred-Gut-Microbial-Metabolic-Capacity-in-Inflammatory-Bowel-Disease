@@ -1,0 +1,99 @@
+test_alpha_floor_projection_mean_one (test_edge_cases.EdgeTests) ... ok
+test_checkpoint_bytes_not_pickle (test_edge_cases.EdgeTests) ... /opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:435: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  fx = wrapped_fun(x)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:439: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  g = append(wrapped_grad(x), 0.0)
+ok
+test_coarse_basis_bounded_resolution (test_edge_cases.EdgeTests) ... ok
+test_constant_ricci_features (test_edge_cases.EdgeTests) ... ok
+test_empty_projection (test_edge_cases.EdgeTests) ... ok
+test_head_gradient_with_ridge (test_edge_cases.EdgeTests) ... ok
+test_immediate_timeout_not_fake_fitted_model (test_edge_cases.EdgeTests) ... ok
+test_negative_tensor_rejected (test_edge_cases.EdgeTests) ... ok
+test_prediction_uses_saved_scaling (test_edge_cases.EdgeTests) ... ok
+test_ridge_objective_bound (test_edge_cases.EdgeTests) ... ok
+test_timeout_after_checkpoint_reports_approximation (test_edge_cases.EdgeTests) ... ok
+test_zero_tensor_on_some_rows (test_edge_cases.EdgeTests) ... ok
+test_complete_entry_and_resume (test_edge_cases.EntryPointTests) ... /opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:435: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  fx = wrapped_fun(x)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:439: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  g = append(wrapped_grad(x), 0.0)
+ok
+test_duplicates_preserved (test_v8.BasisTests) ... ok
+test_empty_is_zero (test_v8.BasisTests) ... ok
+test_filter_boundaries (test_v8.BasisTests) ... ok
+test_not_output_weighting (test_v8.BasisTests) ... ok
+test_scale_frozen_uniform_alpha (test_v8.BasisTests) ... ok
+test_scale_zero_variance (test_v8.BasisTests) ... ok
+test_source_weights (test_v8.BasisTests) ... ok
+test_ties_merged (test_v8.BasisTests) ... ok
+test_training_quantiles_only (test_v8.BasisTests) ... ok
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:435: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  fx = wrapped_fun(x)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:439: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  g = append(wrapped_grad(x), 0.0)
+test_coefficient_bound (test_v8.FitTests) ... ok
+test_constraints (test_v8.FitTests) ... ok
+test_exact_aliases (test_v8.FitTests) ... ok
+test_finite_budget_label_not_convergence (test_v8.FitTests) ... ok
+test_full_scan (test_v8.FitTests) ... ok
+test_joint_converges (test_v8.FitTests) ... ok
+test_near_aliases (test_v8.FitTests) ... ok
+test_nonfinite_prediction_rejected (test_v8.FitTests) ... ok
+test_objective_nonincreasing (test_v8.FitTests) ... ok
+test_reference_saga (test_v8.FitTests) ... ok
+test_resume_same_fit (test_v8.FitTests) ... /opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:435: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  fx = wrapped_fun(x)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:439: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  g = append(wrapped_grad(x), 0.0)
+ok
+test_roundtrip (test_v8.FitTests) ... ok
+test_separable_h0_has_finite_ridge_solution (test_v8.FitTests) ... ok
+test_unseen_prediction (test_v8.FitTests) ... ok
+test_wrong_model_identity (test_v8.FitTests) ... ok
+test_zero_h0_reference (test_v8.FitTests) ... ok
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:435: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  fx = wrapped_fun(x)
+/opt/hostedtoolcache/Python/3.10.22/x64/lib/python3.10/site-packages/scipy/optimize/_slsqp_py.py:439: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  g = append(wrapped_grad(x), 0.0)
+test_all_models_reported (test_v8.FullWorkflowTests) ... ok
+test_all_pairs (test_v8.FullWorkflowTests) ... ok
+test_all_prediction_roundtrips (test_v8.FullWorkflowTests) ... ok
+test_export_private_exclusion (test_v8.FullWorkflowTests) ... ok
+test_manifest_hashes (test_v8.FullWorkflowTests) ... ok
+test_no_inner_models (test_v8.FullWorkflowTests) ... ok
+test_paired_differences (test_v8.FullWorkflowTests) ... ok
+test_partial_not_complete (test_v8.FullWorkflowTests) ... ok
+test_receipt_corruption_blocks (test_v8.FullWorkflowTests) ... ok
+test_repeated_summaries (test_v8.FullWorkflowTests) ... ok
+test_resume_does_not_refit (test_v8.FullWorkflowTests) ... ok
+test_alpha_gradient_independent_difference (test_v8.ObjectiveTests) ... ok
+test_h0_ridge_explicit (test_v8.ObjectiveTests) ... ok
+test_invalid_config_rejected (test_v8.ObjectiveTests) ... ok
+test_l1_zero_kkt (test_v8.ObjectiveTests) ... ok
+test_no_alpha_penalty (test_v8.ObjectiveTests) ... ok
+test_nonfinite_rejected (test_v8.ObjectiveTests) ... ok
+test_original_axis_gradient (test_v8.ObjectiveTests) ... ok
+test_penalty_units (test_v8.ObjectiveTests) ... ok
+test_projection (test_v8.ObjectiveTests) ... ok
+test_ricci_gradient_independent_difference (test_v8.ObjectiveTests) ... ok
+test_single_class_rejected (test_v8.ObjectiveTests) ... ok
+test_new_output_accepted (test_v8.OutputSafetyTests) ... ok
+test_old_output_refused (test_v8.OutputSafetyTests) ... ok
+test_symlink_output_refused (test_v8.OutputSafetyTests) ... ok
+test_unknown_populated_refused (test_v8.OutputSafetyTests) ... ok
+test_conflicting_labels (test_v8.PlanAndMetricTests) ... ok
+test_declared_scope (test_v8.PlanAndMetricTests) ... ok
+test_exact_tie_negative (test_v8.PlanAndMetricTests) ... ok
+test_missing_fold (test_v8.PlanAndMetricTests) ... ok
+test_no_nans_scored (test_v8.PlanAndMetricTests) ... ok
+test_overlap (test_v8.PlanAndMetricTests) ... ok
+test_participant_average (test_v8.PlanAndMetricTests) ... ok
+test_participant_overlap (test_v8.PlanAndMetricTests) ... ok
+test_plan_all_25 (test_v8.PlanAndMetricTests) ... ok
+
+----------------------------------------------------------------------
+Ran 73 tests in 4.804s
+
+OK
+{'tests': 73, 'errors': 0, 'failures': 0, 'skips': 0, 'seconds': 5.5378782460000195}

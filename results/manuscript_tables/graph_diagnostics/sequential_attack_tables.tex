@@ -1,0 +1,67 @@
+\begin{table}[ht]
+\centering
+\caption{Reachable fraction under sequential routing-attack edge removal. Participant-level values are obtained by averaging sample-level diagnostics within participant; values are mean $\pm$ SD across participants.}
+\label{tab:sequential_attack_reachable_fraction}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Condition & $n$ & $k=0$ & $k=1$ & $k=2$ & $k=3$ & $k=5$ & $k=8$ \\
+\midrule
+overall & 106 & 1.000 $\pm$ 0.000 & 0.864 $\pm$ 0.032 & 0.729 $\pm$ 0.039 & 0.622 $\pm$ 0.039 & 0.480 $\pm$ 0.040 & 0.365 $\pm$ 0.036 \\
+CD & 50 & 1.000 $\pm$ 0.000 & 0.867 $\pm$ 0.032 & 0.727 $\pm$ 0.045 & 0.620 $\pm$ 0.043 & 0.476 $\pm$ 0.040 & 0.359 $\pm$ 0.036 \\
+UC & 30 & 1.000 $\pm$ 0.000 & 0.861 $\pm$ 0.032 & 0.735 $\pm$ 0.029 & 0.628 $\pm$ 0.031 & 0.485 $\pm$ 0.033 & 0.370 $\pm$ 0.032 \\
+non-IBD & 26 & 1.000 $\pm$ 0.000 & 0.860 $\pm$ 0.031 & 0.726 $\pm$ 0.037 & 0.619 $\pm$ 0.040 & 0.481 $\pm$ 0.045 & 0.369 $\pm$ 0.037 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Penalised bottleneck weight under sequential routing-attack edge removal. Infeasible source--target pairs are assigned bottleneck weight $1$. Participant-level values are obtained by averaging sample-level diagnostics within participant; values are mean $\pm$ SD across participants.}
+\label{tab:sequential_attack_penalized_bottleneck_w}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Condition & $n$ & $k=0$ & $k=1$ & $k=2$ & $k=3$ & $k=5$ & $k=8$ \\
+\midrule
+overall & 106 & 0.470 $\pm$ 0.090 & 0.559 $\pm$ 0.083 & 0.641 $\pm$ 0.071 & 0.700 $\pm$ 0.061 & 0.774 $\pm$ 0.049 & 0.832 $\pm$ 0.038 \\
+CD & 50 & 0.453 $\pm$ 0.095 & 0.545 $\pm$ 0.085 & 0.632 $\pm$ 0.073 & 0.693 $\pm$ 0.062 & 0.770 $\pm$ 0.049 & 0.830 $\pm$ 0.037 \\
+UC & 30 & 0.470 $\pm$ 0.081 & 0.559 $\pm$ 0.081 & 0.637 $\pm$ 0.066 & 0.695 $\pm$ 0.058 & 0.770 $\pm$ 0.046 & 0.829 $\pm$ 0.038 \\
+non-IBD & 26 & 0.503 $\pm$ 0.078 & 0.588 $\pm$ 0.075 & 0.665 $\pm$ 0.067 & 0.719 $\pm$ 0.059 & 0.787 $\pm$ 0.050 & 0.841 $\pm$ 0.038 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Penalised path length under sequential routing-attack edge removal. Infeasible source--target pairs are assigned the fixed path-length penalty used in the run configuration. Participant-level values are obtained by averaging sample-level diagnostics within participant; values are mean $\pm$ SD across participants.}
+\label{tab:sequential_attack_penalized_path_length}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Condition & $n$ & $k=0$ & $k=1$ & $k=2$ & $k=3$ & $k=5$ & $k=8$ \\
+\midrule
+overall & 106 & 4.599 $\pm$ 0.230 & 7.987 $\pm$ 0.635 & 10.886 $\pm$ 0.744 & 13.170 $\pm$ 0.753 & 16.141 $\pm$ 0.737 & 18.435 $\pm$ 0.641 \\
+CD & 50 & 4.640 $\pm$ 0.190 & 7.957 $\pm$ 0.648 & 10.966 $\pm$ 0.860 & 13.229 $\pm$ 0.814 & 16.236 $\pm$ 0.743 & 18.553 $\pm$ 0.638 \\
+UC & 30 & 4.614 $\pm$ 0.292 & 8.056 $\pm$ 0.650 & 10.760 $\pm$ 0.536 & 13.061 $\pm$ 0.623 & 16.042 $\pm$ 0.636 & 18.335 $\pm$ 0.598 \\
+non-IBD & 26 & 4.502 $\pm$ 0.187 & 7.965 $\pm$ 0.585 & 10.879 $\pm$ 0.687 & 13.181 $\pm$ 0.756 & 16.071 $\pm$ 0.806 & 18.324 $\pm$ 0.657 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Conditional path length under sequential routing-attack edge removal, computed only among source--target pairs that remain reachable. Participant-level values are obtained by averaging sample-level diagnostics within participant; values are mean $\pm$ SD across participants.}
+\label{tab:sequential_attack_finite_path_length}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Condition & $n$ & $k=0$ & $k=1$ & $k=2$ & $k=3$ & $k=5$ & $k=8$ \\
+\midrule
+overall & 106 & 4.599 $\pm$ 0.230 & 5.298 $\pm$ 0.265 & 5.630 $\pm$ 0.279 & 5.970 $\pm$ 0.283 & 6.511 $\pm$ 0.322 & 6.952 $\pm$ 0.363 \\
+CD & 50 & 4.640 $\pm$ 0.190 & 5.344 $\pm$ 0.215 & 5.697 $\pm$ 0.256 & 6.008 $\pm$ 0.259 & 6.550 $\pm$ 0.296 & 6.990 $\pm$ 0.318 \\
+UC & 30 & 4.614 $\pm$ 0.292 & 5.317 $\pm$ 0.328 & 5.610 $\pm$ 0.277 & 5.974 $\pm$ 0.309 & 6.524 $\pm$ 0.353 & 6.976 $\pm$ 0.457 \\
+non-IBD & 26 & 4.502 $\pm$ 0.187 & 5.188 $\pm$ 0.237 & 5.526 $\pm$ 0.289 & 5.893 $\pm$ 0.282 & 6.420 $\pm$ 0.315 & 6.851 $\pm$ 0.297 \\
+\bottomrule
+\end{tabular}
+\end{table}
+

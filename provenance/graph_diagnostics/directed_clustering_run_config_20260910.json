@@ -1,0 +1,25 @@
+{
+  "analysis": "directed_clustering_active_participant_average",
+  "script_sha256": "9461f5a476bf349f6df743407385cf0bed4a5ce0d8bc3c326a68a5b0a494e0ea",
+  "metadata": {
+    "path": "/home/Jack/Real_Data/hmp2_metadata.csv",
+    "sha256": "656b7bd97660ddb875548805e30bede31f2d1208293f7170d2d5755e33862ec9"
+  },
+  "graph_dir": "/home/Jack/Real_Data/out_graphs",
+  "matched_samples": 1317,
+  "participants": 106,
+  "empty_active_graphs": 11,
+  "active_edge_rule": "w < 1 - 1e-12",
+  "active_vertices_only": true,
+  "weighted_strength": "s = 1 - w without global max normalization",
+  "duplicate_edge_rule": "retain minimum w / maximum support strength",
+  "aggregation": "sample graph -> participant average -> condition summary",
+  "sd_ddof": 0,
+  "runtime": {
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3",
+    "platform": "Linux-6.8.0-1052-azure-x86_64-with-glibc2.35"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "current": "regularised_v8",
+  "schema": "joint-ibd-regularised-v8.0.0",
+  "entrypoint": "analysis/joint/run.py",
+  "package": "analysis/joint/regularised_v8",
+  "original_delivery_zip_sha256": "34b85d1657f000954c54b1b2c84fbb66da258c3f57773ec3dbf9762ed0f570c9",
+  "original_review_archive_sha256": "060ff0950138dfa28a624595eb3532bce724248b5d9506f8a32a2cea8e90f4fe",
+  "delivered_package_manifest_sha256": "9b90bbaa768c961a84ad1fbe64564e246ec9a3d40d9fef6031d69acf92c96343",
+  "repeats": 5,
+  "outer_folds": 5,
+  "task": "IBD_vs_nonIBD",
+  "M_requested": 32,
+  "C": 0.02,
+  "h0_ridge": 0.001,
+  "numerical_state": "COMPLETE_ALL_CONVERGED",
+  "historical_not_current": [
+    "analysis/joint/core",
+    "analysis/joint/repeated_cv"
+  ],
+  "executed_VM_source_manifest_in_aggregate_export": false
+}
