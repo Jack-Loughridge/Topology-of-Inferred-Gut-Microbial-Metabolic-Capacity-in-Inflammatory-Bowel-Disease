@@ -1,0 +1,7 @@
+# Numerical-library versions recorded for the completed v8 production environment.
+# The production preflight also requires its recorded Python 3.10.12 environment.
+# Install only into a separate reproduction environment, never upgrade the frozen VM.
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.3
+scikit-learn==1.7.2

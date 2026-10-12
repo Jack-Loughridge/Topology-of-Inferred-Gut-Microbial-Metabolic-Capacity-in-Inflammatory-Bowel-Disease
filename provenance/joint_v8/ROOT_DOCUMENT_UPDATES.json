@@ -1,0 +1,14 @@
+{
+  "README.md": {
+    "before_git_blob": "cd5b4ce080bf76af479c9308042baf6525106754",
+    "after_sha256": "1c67ec2793494fde3bf4ecac05652e6b6d1685a7a8edc8939b701eada2716921"
+  },
+  "docs/MANUSCRIPT_CODE_MAP.md": {
+    "before_git_blob": "2da6a50146ec484cd29b98cfde2c879551ce5c55",
+    "after_sha256": "71cafee0e62fc5f57f7f1372d2bcda15c58719546b93f72668a85afd578315b1"
+  },
+  "run_checks.py": {
+    "before_git_blob": "8deea54dadfe70719223d07bf93c60be9a150c13",
+    "after_sha256": "c29f6e9d0ea017c09c56d02f15be52375b96359b23b0823a72193743c1bd69d2"
+  }
+}

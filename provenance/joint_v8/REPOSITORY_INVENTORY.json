@@ -1,0 +1,312 @@
+{
+  "source_baseline": "effc7bf0661cbf36dda4ed82c44a54a455ad60a4",
+  "inventory_scope": "tracked-style source/configuration paths, excluding observations and .git",
+  "path_count": 341,
+  "categories": {
+    "h0_descriptive_names": [],
+    "later_representation_audit_names": [],
+    "all_task_external_followup_names": [],
+    "canonical_interpretation": [
+      "analysis/interpretation/build_mapped_ricci_interpretation_tables.py",
+      "analysis/interpretation/build_ricci_reaction_interpretability.py",
+      "analysis/interpretation/make_h0_ricci_joint_manuscript_outputs.py",
+      "analysis/interpretation/make_ricci_ibd_cpath_manuscript_outputs.py",
+      "analysis/interpretation/make_species_benchmark_manuscript_outputs.py",
+      "analysis/interpretation/rebuild_process_tables_split_B_K0.py"
+    ],
+    "locked_run_configs": [
+      "provenance/locked_run_configs/directed_clustering_config.json",
+      "provenance/locked_run_configs/edge_concentration_weight_top001_config.json",
+      "provenance/locked_run_configs/h0_CD_vs_UC_run_config.json",
+      "provenance/locked_run_configs/h0_ibd_run_config.json",
+      "provenance/locked_run_configs/h0_nonIBD_vs_CD_run_config.json",
+      "provenance/locked_run_configs/h0_nonIBD_vs_UC_run_config.json",
+      "provenance/locked_run_configs/h0_three_way_nonIBD_UC_CD_run_config.json",
+      "provenance/locked_run_configs/joint_orchestrator_config.json",
+      "provenance/locked_run_configs/outdegree_hist_active_participant_mean_config.json",
+      "provenance/locked_run_configs/path_backbone_longrange_config.json",
+      "provenance/locked_run_configs/ricci_ibd_b_only_run_config.json",
+      "provenance/locked_run_configs/ricci_ibd_k0_only_run_config.json",
+      "provenance/locked_run_configs/ricci_ibd_run_config.json",
+      "provenance/locked_run_configs/ricci_remaining_tasks_run_config.json",
+      "provenance/locked_run_configs/ricci_three_binary_tasks_run_config.json",
+      "provenance/locked_run_configs/sequential_routing_attack_config.json",
+      "provenance/locked_run_configs/species_ibd_run_config.json",
+      "provenance/locked_run_configs/species_remaining_tasks_run_config.json",
+      "provenance/locked_run_configs/weight_density_participant_average_config.json"
+    ],
+    "canonical_external": [
+      "external_validation/serrano_gomez/scripts/apply_frozen_h0_alphapi_ensemble_external_ibd_v1.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_h0_alphapi_ensemble_external_ibd_v1_host_subject.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_ricci_ibd_model_expanded_v2.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_ricci_ibd_model_v1.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_ibd_last_occurrence_v1.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_ibd_v1.py",
+      "external_validation/serrano_gomez/scripts/apply_frozen_species_benchmarks_external_v2_last_occurrence_all184.py",
+      "external_validation/serrano_gomez/scripts/audit_expanded_external_v2_prerequisites.py",
+      "external_validation/serrano_gomez/scripts/build_expanded_external_v2.py",
+      "external_validation/serrano_gomez/scripts/build_ge50_external_ec_graphs.py",
+      "external_validation/serrano_gomez/scripts/build_ge50_species_proxy_graphs_033.py",
+      "external_validation/serrano_gomez/scripts/check_ge50_md5.py",
+      "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+      "external_validation/serrano_gomez/scripts/stream_build_h0_v260.py"
+    ]
+  },
+  "source_hits": {
+    "entropy_code": [],
+    "ricci_path_settings": [
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 34,
+        "text": "    d(u,v) = -log(epsilon_dist + q(u,v)) otherwise"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 81,
+        "text": "    epsilon_dist: float = 1e-4"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 82,
+        "text": "    c_single_out: float = 0.001"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 89,
+        "text": "    n_paths: int = 1000"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 299,
+        "text": "        probs[nbrs[0]] = 1.0 - cfg.c_single_out"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 417,
+        "text": "            # 1 - c_single_out for outdegree-one vertices."
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 462,
+        "text": "        - path probability falls below epsilon_dist,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 481,
+        "text": "        for _ in range(cfg.n_paths):"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 501,
+        "text": "                if new_p < cfg.epsilon_dist:"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 524,
+        "text": "                \"mean_steps\": float(total_steps / cfg.n_paths),"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 539,
+        "text": "    return reach_cache.get(u, {}).get(v, 0) / float(cfg.n_paths)"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 544,
+        "text": "    return float(-math.log(cfg.epsilon_dist + q))"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 740,
+        "text": "            \"n_paths\": int(cfg.n_paths),"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 776,
+        "text": "                    \"n_paths\": cfg.n_paths,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 777,
+        "text": "                    \"epsilon_dist\": cfg.epsilon_dist,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 779,
+        "text": "                    \"c_single_out\": cfg.c_single_out,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 823,
+        "text": "        \"n_paths\": int(cfg.n_paths),"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 856,
+        "text": "    ap.add_argument(\"--n-paths\", type=int, default=Config.n_paths)"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 861,
+        "text": "    ap.add_argument(\"--epsilon-dist\", type=float, default=Config.epsilon_dist)"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 862,
+        "text": "    ap.add_argument(\"--c-single-out\", type=float, default=Config.c_single_out)"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 885,
+        "text": "        epsilon_dist=args.epsilon_dist,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 886,
+        "text": "        c_single_out=args.c_single_out,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 890,
+        "text": "        n_paths=args.n_paths,"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 924,
+        "text": "    print(f\"    n_paths:   {cfg.n_paths}\")"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 926,
+        "text": "    print(f\"    epsilon:   {cfg.epsilon_dist}\")"
+      },
+      {
+        "path": "pipeline/topology/compute_ricci_faithful_pairwise_active.py",
+        "line": 927,
+        "text": "    print(f\"    c_single:  {cfg.c_single_out}\")"
+      }
+    ],
+    "ricci_availability": [
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 127,
+        "text": "    if not math.isfinite(x):"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 261,
+        "text": "            ok = kappa.notna() & np.isfinite(kappa.to_numpy(dtype=float))"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 313,
+        "text": "            ok = kappa.notna() & np.isfinite(kappa.to_numpy(dtype=float))"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 745,
+        "text": "    all_vals = all_vals[np.isfinite(all_vals)]"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 771,
+        "text": "        vals = vals[np.isfinite(vals)]"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 833,
+        "text": "            sd = np.where(np.isfinite(sd), sd, 0.0)"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 986,
+        "text": "        vals = vals[np.isfinite(vals)]"
+      },
+      {
+        "path": "analysis/ricci/feature_builder/faithful_ricci_classifier.py",
+        "line": 1016,
+        "text": "        vals = vals[np.isfinite(vals)]"
+      },
+      {
+        "path": "analysis/ricci/five_task_repeated_cv/ricci_all_tasks.py",
+        "line": 421,
+        "text": "    if not np.isfinite(dense).all():"
+      },
+      {
+        "path": "analysis/ricci/five_task_repeated_cv/ricci_all_tasks.py",
+        "line": 657,
+        "text": "    finite = values[np.isfinite(values)]"
+      },
+      {
+        "path": "analysis/ricci/ibd_block_ablation/run_ibd_block_ablation.py",
+        "line": 383,
+        "text": "    if not np.isfinite(X_block).all():"
+      },
+      {
+        "path": "analysis/ricci/ibd_block_ablation/run_ibd_block_ablation.py",
+        "line": 761,
+        "text": "    if not np.isfinite(K0).all() or not np.any(K0 != 0):"
+      },
+      {
+        "path": "analysis/ricci/ibd_cpath/repeated_ricci_ibd_cpath.py",
+        "line": 145,
+        "text": "    if not math.isfinite(value):"
+      },
+      {
+        "path": "analysis/ricci/ibd_cpath/repeated_ricci_ibd_cpath.py",
+        "line": 221,
+        "text": "        process = str(proc_value) if pd.notna(proc_value) else \"Unannotated\""
+      },
+      {
+        "path": "analysis/ricci/ibd_cpath/repeated_ricci_ibd_cpath.py",
+        "line": 222,
+        "text": "        display = str(display_value) if pd.notna(display_value) else decode_edge_for_display(edge)"
+      },
+      {
+        "path": "analysis/ricci/ibd_cpath/repeated_ricci_ibd_cpath.py",
+        "line": 854,
+        "text": "    finite = array[np.isfinite(array)]"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 305,
+        "text": "        if not math.isfinite(v) or v < 0:"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 439,
+        "text": "        if not math.isfinite(w):"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 467,
+        "text": "    d = d[np.isfinite(d)]"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 654,
+        "text": "            frac = float(vals.notna().mean())"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 667,
+        "text": "        if not math.isfinite(float(val)) if pd.notna(val) else True:"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 914,
+        "text": "        if not math.isfinite(w) or w < 0.0 or w > 1.0 + 1e-12:"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 1502,
+        "text": "                if not math.isfinite(kval):"
+      },
+      {
+        "path": "external_validation/serrano_gomez/scripts/serrano_gomez_external_structural_frozen_ibdmdb_v1/external_structural_validation.py",
+        "line": 1513,
+        "text": "            if not math.isfinite(kval):"
+      }
+    ]
+  }
+}

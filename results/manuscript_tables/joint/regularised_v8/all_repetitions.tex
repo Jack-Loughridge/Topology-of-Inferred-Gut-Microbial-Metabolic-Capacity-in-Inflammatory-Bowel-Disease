@@ -1,0 +1,37 @@
+\begin{table}[!htbp]
+\centering\small
+\caption{\jointfinal{All regularised joint and matched Ricci repetition metrics. Each row pools the five held out folds within one repetition.}}
+\label{tab:joint-v8-all-repetitions}
+\begingroup\bfseries\boldmath
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llrrrrrr}
+\toprule
+Level & Model & Repeat & Accuracy & Bal. acc. & Macro $F_1$ & AUC & Log loss \\
+\midrule
+Participant & Joint & $1$ & $0.736$ & $0.669$ & $0.660$ & $0.729$ & $0.550$ \\
+Participant & Joint & $2$ & $0.736$ & $0.669$ & $0.660$ & $0.705$ & $0.569$ \\
+Participant & Joint & $3$ & $0.708$ & $0.650$ & $0.636$ & $0.711$ & $0.574$ \\
+Participant & Joint & $4$ & $0.698$ & $0.657$ & $0.635$ & $0.693$ & $0.584$ \\
+Participant & Joint & $5$ & $0.698$ & $0.618$ & $0.612$ & $0.633$ & $0.628$ \\
+Participant & Ricci & $1$ & $0.736$ & $0.682$ & $0.668$ & $0.705$ & $0.561$ \\
+Participant & Ricci & $2$ & $0.726$ & $0.650$ & $0.644$ & $0.677$ & $0.580$ \\
+Participant & Ricci & $3$ & $0.708$ & $0.663$ & $0.643$ & $0.697$ & $0.580$ \\
+Participant & Ricci & $4$ & $0.670$ & $0.561$ & $0.560$ & $0.682$ & $0.579$ \\
+Participant & Ricci & $5$ & $0.689$ & $0.586$ & $0.585$ & $0.592$ & $0.641$ \\
+Sample & Joint & $1$ & $0.705$ & $0.646$ & $0.641$ & $0.696$ & $0.597$ \\
+Sample & Joint & $2$ & $0.681$ & $0.626$ & $0.618$ & $0.664$ & $0.682$ \\
+Sample & Joint & $3$ & $0.683$ & $0.629$ & $0.621$ & $0.673$ & $0.622$ \\
+Sample & Joint & $4$ & $0.670$ & $0.617$ & $0.608$ & $0.662$ & $0.644$ \\
+Sample & Joint & $5$ & $0.655$ & $0.588$ & $0.583$ & $0.614$ & $0.680$ \\
+Sample & Ricci & $1$ & $0.708$ & $0.645$ & $0.642$ & $0.684$ & $0.592$ \\
+Sample & Ricci & $2$ & $0.683$ & $0.607$ & $0.606$ & $0.648$ & $0.623$ \\
+Sample & Ricci & $3$ & $0.691$ & $0.630$ & $0.625$ & $0.674$ & $0.603$ \\
+Sample & Ricci & $4$ & $0.669$ & $0.592$ & $0.590$ & $0.649$ & $0.619$ \\
+Sample & Ricci & $5$ & $0.631$ & $0.549$ & $0.547$ & $0.587$ & $0.670$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip\begin{minipage}{0.98\linewidth}\footnotesize Participant probabilities are means of sample probabilities. Lower log loss is better. No unfinished fold or repetition is omitted.
+\end{minipage}
+\endgroup
+\end{table}
