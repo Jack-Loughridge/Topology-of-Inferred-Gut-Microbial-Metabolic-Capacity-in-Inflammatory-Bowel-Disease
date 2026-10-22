@@ -21,12 +21,15 @@ Direct URLs, the derived-input hashes, and the privacy-preserving source-match e
 
 ## External validation cohort
 
-The independent external cohort is the Serrano-Gomez shotgun-metagenomic IBD study.
+**The independent external cohort is Cohort 2 of the University of California San Diego (UCSD) IBD multi-omic study reported by Mills et al.**
 
 - ENA study used by the acquisition scripts: `PRJEB42155`
-- Study publication: Serrano-Gomez et al., *Computational and Structural Biotechnology Journal* (2021), DOI `10.1016/j.csbj.2021.11.037`
+- **Study publication: Mills et al., *Nature Microbiology* (2022), DOI [10.1038/s41564-021-01050-3](https://doi.org/10.1038/s41564-021-01050-3).**
+- **Deidentified cohort metadata: `Combined_Metadata_Allomics_MP_V1.txt`, provided through MassIVE deposit `MSV000086509`; access instructions are in the [original study's analysis repository](https://github.com/knightlab-analyses/uc-severity-multiomics/blob/master/README.md).**
 - Download script: `external_validation/serrano_gomez/scripts/download_ge50_fastqs.sh`
 - Integrity checker: `external_validation/serrano_gomez/scripts/check_ge50_md5.py`
+
+**The `serrano_gomez` names in these paths are historical labels for the UCSD analysis. The paths and frozen source-package README are retained for provenance; the cohort attribution above supersedes the old label.**
 
 The final derived-data archive must include the exact selected-run manifest, sample-to-participant mapping used for evaluation, inclusion/exclusion reasons, source URLs, and source MD5 values. It must not include information prohibited by the source repository's terms.
 

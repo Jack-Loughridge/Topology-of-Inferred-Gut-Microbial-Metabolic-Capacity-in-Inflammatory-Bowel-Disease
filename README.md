@@ -116,7 +116,9 @@ and large results are deliberately excluded from Git.
 
 ## Data and code availability
 
-The source cohort is the public IBDMDB/HMP2 study (BioProject `PRJNA398089`). The external Serrano-Gomez processing scripts use ENA study `PRJEB42155`. The graph pipeline uses AGORA2 version 2.01, obtained separately from the Virtual Metabolic Human resource and subject to its original distribution terms. Exact public-product and production-input hashes are recorded in `provenance/INPUT_PROVENANCE.md`.
+The source cohort is the public IBDMDB/HMP2 study (BioProject `PRJNA398089`). **External sequencing data are from Cohort 2 of the University of California San Diego (UCSD) study reported by [Mills et al. (2022)](https://doi.org/10.1038/s41564-021-01050-3), available through ENA study `PRJEB42155`.** The graph pipeline uses AGORA2 version 2.01, obtained separately from the Virtual Metabolic Human resource and subject to its original distribution terms. Exact public-product and production-input hashes are recorded in `provenance/INPUT_PROVENANCE.md`.
+
+**The `serrano_gomez` names in the external-validation paths are historical labels for the UCSD analysis. The paths and frozen source-package README are retained for provenance; the cohort attribution above supersedes the old label. See [Data and code availability](docs/DATA_AVAILABILITY.md) for the original cohort metadata source.**
 
 Raw sequence data and large intermediate matrices are not redistributed in this Git repository. The final release will link a permanent archive containing the compact derived materials needed to verify every reported table and figure, together with a checksum manifest.
 

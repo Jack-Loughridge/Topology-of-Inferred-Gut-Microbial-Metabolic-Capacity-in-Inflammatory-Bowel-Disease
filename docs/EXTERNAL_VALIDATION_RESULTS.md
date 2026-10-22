@@ -6,7 +6,9 @@ The repository distinguishes two external analysis roles:
 
 1. **Strict external validation (v1):** models, feature coordinates,
    preprocessing, and thresholds were fixed from IBDMDB before evaluation in
-   Serrano--Gomez. This cohort contains 90 samples from 78 host subjects.
+   **the UCSD cohort reported by [Mills et al. (2022)](https://doi.org/10.1038/s41564-021-01050-3)
+   (Cohort 2; ENA `PRJEB42155`). The strict evaluation set contains 90 samples
+   from 78 host subjects.**
 2. **Exploratory expanded-community replication (v2):** frozen prediction
    models were applied to 184 samples from 154 host subjects after constructing
    the expanded external-community representation. Because the structural
