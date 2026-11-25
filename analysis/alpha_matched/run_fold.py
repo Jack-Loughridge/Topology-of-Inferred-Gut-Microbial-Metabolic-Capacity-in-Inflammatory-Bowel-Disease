@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from . import unitcache, bundle, release as clinical
+from .cache import payload_name
 from .artifacts import Store, sha, space
 from .comparators import Baseline
 from .features import Factory
@@ -452,11 +453,11 @@ def geometry_files(destination, expected):
             raise ValueError('Invalid geometry receipt')
         if record['key']['arm'] == 'RAW':
             primitives.add(record['raw_calculation'])
-        arr = path.with_name(record['sha256'] + '.npy')
-        if bundle.sha(arr) != record['sha256']:
+        arr = path.with_name(payload_name(record))
+        if bundle.sha(arr) != record.get('zlib_sha256', record['sha256']):
             raise ValueError('Changed curvature array')
         files[str(path.relative_to(destination))] = sha(data)
-        files[str(arr.relative_to(destination))] = record['sha256']
+        files[str(arr.relative_to(destination))] = record.get('zlib_sha256', record['sha256'])
     if shards:
         raise ValueError('Missing geometry receipts')
     actual = {p.parent.name for p in (geometry / '.raw-numerics').glob('*/receipt.json')}
@@ -466,11 +467,11 @@ def geometry_files(destination, expected):
         path = geometry / '.raw-numerics' / primitive / 'receipt.json'
         data = path.read_bytes()
         record = json.loads(data)['record']
-        array = path.with_name(record['sha256'] + '.npy')
-        if bundle.sha(array) != record['sha256']:
+        array = path.with_name(payload_name(record))
+        if bundle.sha(array) != record.get('zlib_sha256', record['sha256']):
             raise ValueError('Changed RAW numerical array')
         files[str(path.relative_to(destination))] = sha(data)
-        files[str(array.relative_to(destination))] = record['sha256']
+        files[str(array.relative_to(destination))] = record.get('zlib_sha256', record['sha256'])
     return files
 
 
