@@ -117,6 +117,9 @@ class Store:
 
     def load_vector(self, name):
         record = json.loads(self.read(name))
+        if 'format' in record:
+            from .vector_storage import RecipeStore
+            return RecipeStore(self.root).restore(record)
         identity = record.pop('identity')
         record['values'] = self.load_array(record['values'])
         for axis in ('ids', 'features'):

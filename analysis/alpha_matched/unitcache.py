@@ -26,31 +26,41 @@ def environment():
                                             'MKL_NUM_THREADS', 'CUDA_VISIBLE_DEVICES')}]
 
 
-def dependencies(store, value):
-    """Verify and re-register the full content-addressed object graph on restart."""
+def object_closure(store, value):
+    """Verify reachable Store objects while preserving the schema's opaque labels."""
     seen = set()
+    expanded = set()
+    literal_fields = {'sample', 'samples', 'participants', 'classes', 'train_groups', 'endpoint',
+                      'name', 'method', 'split', 'setting', 'tolerances'}
+    axis_fields = {'ids', 'features', 'species_taxa', 'training_visits'}
 
-    def visit(v):
+    def visit(v, axis=False):
         if isinstance(v, dict):
             for key, child in v.items():
-                if key not in ('samples', 'participants', 'classes', 'train_groups', 'endpoint',
-                               'name', 'method', 'split', 'setting', 'tolerances'):
-                    visit(child)
+                if key not in literal_fields:
+                    visit(child, axis=key in axis_fields)
         elif isinstance(v, (tuple, list)):
-            for child in v:
-                visit(child)
-        elif isinstance(v, str) and re.fullmatch(r'[0-9a-f]{64}\.(jsonz?|npyz)', v) and v not in seen:
+            if not axis:
+                for child in v:
+                    visit(child)
+        elif isinstance(v, str) and re.fullmatch(r'[0-9a-f]{64}\.(jsonz?|npyz?)', v):
+            if (v, axis) in expanded:
+                return
+            expanded.add((v, axis))
             seen.add(v)
-            if v.endswith('.npyz'):
+            if v.endswith(('.npy', '.npyz')):
                 if not np.isfinite(store.load_array(v)).all():
                     raise ValueError('Nonfinite unit dependency')
             else:
                 record = json.loads(store.read(v))
-                # Standalone list objects contain sample, taxon, or coordinate labels.
-                if isinstance(record, dict):
-                    visit(record)
+                visit(record, axis=axis)
     visit(value)
-    store.objects.update(seen)
+    return seen
+
+
+def dependencies(store, value):
+    """Re-register the verified dependency graph when resuming a unit."""
+    store.objects.update(object_closure(store, value))
 
 
 class Units:

@@ -68,6 +68,54 @@ def methods_by_arm(config):
     return registered
 
 
+def producing_sources(store, config):
+    """Resolve the producing version and configuration of this sealed core fold."""
+    directory = store.root.resolve(strict=True)
+    category = 'development-final-refits' if directory.name == run_fold.FINAL else 'development-folds'
+    root = directory.parents[3]
+    if directory.parents[1] != root/'jobs'/category or not (directory/'receipt.json').is_file():
+        raise ValueError('Expected a sealed released core fold')
+    status = run_fold.active(root)
+    entry = status['final_refit_release' if directory.name == run_fold.FINAL else 'development_fold_release']
+    header = run_fold.inside(root/'reviews', entry['file']).read_bytes()
+    if sha(header) != entry['sha256'] or entry['sha256'] != directory.parent.name:
+        raise ValueError('Core producer release identity mismatch')
+    release = json.loads(header)
+    spec = release['inputs']['config']
+    data = run_fold.inside(root/'manifests/development-fold-inputs', spec['path']).read_bytes()
+    if (directory.name not in release['folds'] or sha(data) != spec['sha256'] or
+            canonical_json(json.loads(data)) != canonical_json(config)):
+        raise ValueError('Fit configuration differs from pinned core release')
+    return release['source_sha256']
+
+
+def core_fit_unit(store, objects, fit_id, fit, train, valid, config, sources):
+    """Bind the OOF wrapper to the actual released core unit before consuming its vectors."""
+    method = fit['name']
+    kinds = ['H0', 'Ricci'] if method == 'joint' else [method]
+    compact_producer = 'vector_storage.py' in sources
+    mode = config.get('ricci_storage', 'active-v2' if compact_producer else 'dense')
+    if mode not in ('active-v2', 'dense') or (mode == 'active-v2' and not compact_producer):
+        raise ValueError('Unsupported released Ricci storage format')
+    blocks = fit.get('blocks', [])
+    if len(blocks) != len(kinds):
+        raise ValueError('Missing standalone blocks in core producer fit')
+    for block, kind in zip(blocks, kinds):
+        if block['model'] not in objects or json.loads(store.read(block['model']))['name'] != kind:
+            raise ValueError('Unexpected core producer block layout')
+        if mode == 'active-v2' and kind in ('Ricci', 'K0') and 'contract' not in block:
+            raise ValueError('Missing compact producer split contract')
+    version = sha(canonical_json(sources))
+    runtime = json.loads((store.root/'runtime.json').read_bytes())
+    context = sha(canonical_json([store.root.parent.name, fit['arm'], version, config, runtime]))
+    rosters = [list(zip(frame.index, frame.person)) for frame in (train, valid)]
+    identity = ['fit', method, fit['split'], rosters, [blocks, fit['head']]]
+    unit = sha(canonical_json([context, identity]))
+    ref = json.loads((store.root/('unit-' + unit + '.json')).read_bytes())['record']
+    if ref not in objects or json.loads(store.read(ref)) != dict(key=unit, result=fit_id):
+        raise ValueError('OOF vector evidence differs from completed source-bound fit')
+
+
 def fit_table(store, objects, fit_id, arm, method, split, train, valid, config):
     if fit_id not in objects:
         raise IncompleteCoverage('Fit absent from fold object manifest')
@@ -77,6 +125,12 @@ def fit_table(store, objects, fit_id, arm, method, split, train, valid, config):
                     samples=valid.index.tolist(), participants=sorted(set(valid.person)))
     if any(fit.get(k) != v for k, v in expected.items()):
         raise ValueError('Fit identity, class order, training groups or held-out roster mismatch')
+    if method in ('joint', 'Ricci', 'K0'):
+        sources = producing_sources(store, config)
+        if 'candidates' in config:
+            core_fit_unit(store, objects, fit_id, fit, train, valid, config, sources)
+    for block in fit.get('blocks', []):
+        run_fold.vector_storage.verify_evidence(store, block, train, valid, arm, objects=objects)
     if any(fit[k] not in objects for k in ('probabilities', 'participant_means')):
         raise IncompleteCoverage('Prediction arrays absent from fold object manifest')
     p = store.load_array(fit['probabilities'])

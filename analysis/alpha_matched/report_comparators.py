@@ -79,6 +79,7 @@ class FitEvidence:
         partition = digest(canonical_json(sorted(zip(train.index, train.person))))
         vectors = []
         for block, kind in zip(blocks, names):
+            driver.core.vector_storage.verify_evidence(self.store, block, train, valid, arm, objects=self.objects)
             model = self.record(block['model'])
             if (model['arm'], model['name'], model['partition'], model['training_people_sha256']) != (
                     arm, kind, partition, sha(canonical_json(sorted(set(train.person))))):

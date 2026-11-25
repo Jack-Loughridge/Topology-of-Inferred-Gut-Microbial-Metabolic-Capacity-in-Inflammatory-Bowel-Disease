@@ -3,12 +3,15 @@ from contextlib import contextmanager
 from pathlib import Path
 import fcntl
 import hashlib
+import io
 import json
 import os
 import tempfile
+import zlib
 
 import numpy as np
 
+from .artifacts import space
 from .partitions import canonical_json
 
 FIELDS = frozenset("""
@@ -16,6 +19,27 @@ input_digest catalogue_digest mapping_digest arm reference_digest training_peopl
 graph_rules transition rho epsilon endpoint_measure feature_definition scaler_digest
 solver tolerance implementation_digest active_pairs_digest
 """.split())
+
+
+def payload_name(record):
+    """The logical checksum always identifies the complete original NPY."""
+    if 'zlib_sha256' in record:
+        return record['zlib_sha256'] + '.npyz'
+    return record['sha256'] + '.npy'
+
+
+def encode_payload(arr, allocation_unit):
+    stream = io.BytesIO()
+    np.save(stream, arr, allow_pickle=False)
+    raw = stream.getvalue()
+    record = {'sha256': hashlib.sha256(raw).hexdigest()}
+    # Saving bytes inside the same allocation unit saves no physical blocks.
+    if len(raw) > allocation_unit:
+        compressed = zlib.compress(raw)
+        if (len(compressed) - 1) // allocation_unit < (len(raw) - 1) // allocation_unit:
+            record['zlib_sha256'] = hashlib.sha256(compressed).hexdigest()
+            return record, compressed
+    return record, raw
 
 
 class CurvatureCache:
@@ -43,11 +67,14 @@ class CurvatureCache:
         self.validate_certificate(info['certificate'])
         if info['key'] != json.loads(self.identity):
             raise ValueError('Unexpected cached configuration')
-        path = self.folder/(info['sha256']+'.npy')
+        path = self.folder/payload_name(info)
         content = path.read_bytes()
+        if 'zlib_sha256' in info:
+            if hashlib.sha256(content).hexdigest() != info['zlib_sha256']:
+                raise ValueError('Compressed curvature cache failed digest verification')
+            content = zlib.decompress(content)
         if hashlib.sha256(content).hexdigest() != info['sha256']:
             raise ValueError('Curvature cache failed digest verification')
-        import io
         arr = np.load(io.BytesIO(content),allow_pickle=False)
         self.validate(arr,active_pairs)
         if info['active_edges'] != len(arr) or info['finite_edges'] != len(arr) or info['failed'] != 0:
@@ -72,10 +99,10 @@ class CurvatureCache:
             present=self.read(active_pairs)
             if present is None:
                 evidence=json.loads((primitive.folder/'receipt.json').read_bytes())['record']
-                name=evidence['sha256']+'.npy'
+                name=payload_name(evidence)
                 dest=self.folder/name
                 if dest.exists():
-                    if hashlib.sha256(dest.read_bytes()).hexdigest()!=evidence['sha256']:
+                    if hashlib.sha256(dest.read_bytes()).hexdigest()!=evidence.get('zlib_sha256',evidence['sha256']):
                         raise ValueError('Conflicting RAW numerical object')
                 else:
                     os.link(primitive.folder/name,dest)
@@ -83,7 +110,7 @@ class CurvatureCache:
                 tmp=self.folder/'pending.json'
                 tmp.write_bytes(canonical_json({'record':record,'digest':hashlib.sha256(canonical_json(record)).hexdigest()}))
                 os.replace(tmp,self.folder/'receipt.json')
-            elif not np.array_equal(present,values):
+            elif present.dtype != values.dtype or present.tobytes() != values.tobytes():
                 raise ValueError('Partition RAW value differs from numerical primitive')
         return values
 
@@ -110,18 +137,25 @@ class CurvatureCache:
         with self.locked():
             prior = self.read(active_pairs)
             if prior is not None:
-                if not np.array_equal(prior,arr):
+                if prior.dtype != arr.dtype or prior.tobytes() != arr.tobytes():
                     raise ValueError('Conflicting results for same cache identity')
                 return
-            with tempfile.NamedTemporaryFile(dir=self.folder,delete=False) as stream:
-                np.save(stream,arr,allow_pickle=False)
-                stream.flush()
-                os.fsync(stream.fileno())
-            tmp = Path(stream.name)
-            sha = hashlib.sha256(tmp.read_bytes()).hexdigest()
-            os.replace(tmp,self.folder/(sha+'.npy'))
-            record = dict(key=json.loads(self.identity),sha256=sha,active_edges=len(arr),finite_edges=len(arr),
-                          failed=0,certificate=certificate)
+            checksums, payload = encode_payload(arr, os.statvfs(self.folder).f_frsize)
+            space(self.folder, len(payload))
+            # Publish payload first. A crash here can leave an unreferenced object,
+            # never a receipt pointing at a partially written array.
+            with tempfile.NamedTemporaryFile(dir=self.folder) as tmp:
+                tmp.write(payload)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+                path = self.folder/payload_name(checksums)
+                try:
+                    os.link(tmp.name, path)
+                except FileExistsError:
+                    if path.read_bytes() != payload:
+                        raise ValueError('Conflicting curvature object on resume')
+            record = dict(key=json.loads(self.identity), **checksums, active_edges=len(arr),
+                          finite_edges=len(arr), failed=0, certificate=certificate)
             marker = self.folder/'pending.json'
             marker.write_bytes(canonical_json({'record':record,'digest':hashlib.sha256(canonical_json(record)).hexdigest()}))
             os.replace(marker,self.folder/'receipt.json')

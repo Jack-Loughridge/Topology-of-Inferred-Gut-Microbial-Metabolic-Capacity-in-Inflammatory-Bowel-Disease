@@ -166,6 +166,7 @@ class FrozenPrimary:
             dest.objects.add(obj)
         partition = digest(canonical_json(sorted(zip(train.index, train.person))))
         for block in blocks:
+            core.vector_storage.verify_evidence(dest, block, train, valid, arm, objects=self.objects)
             for side, frame in [('train', train), ('validate', valid)]:
                 v = dest.load_vector(block[side])
                 expected_name = 'H0' if block == h0 else 'Ricci'

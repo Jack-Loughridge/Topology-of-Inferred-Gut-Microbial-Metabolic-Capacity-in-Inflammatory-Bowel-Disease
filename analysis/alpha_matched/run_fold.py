@@ -11,7 +11,8 @@ import re
 import numpy as np
 import pandas as pd
 
-from . import unitcache, bundle, release as clinical
+from . import unitcache, vector_storage, bundle, release as clinical
+from .cache import payload_name
 from .artifacts import Store, sha, space
 from .comparators import Baseline
 from .features import Factory
@@ -27,7 +28,7 @@ BUNDLE_FILES = {'raw.npz', 'vertices.npz', 'abundance.npz', 'pairs.npy', 'axes.j
 
 def source_hashes():
     modules = ('artifacts bundle cache certified_reference comparators features geometry h0 '
-               'integer_transport log_kernel nesting partitions release run_fold statistics support thresholding unitcache').split()
+               'integer_transport log_kernel nesting partitions release run_fold statistics support thresholding unitcache vector_storage').split()
     return {name + '.py': bundle.sha(Path(__file__).with_name(name + '.py')) for name in modules}
 
 
@@ -152,6 +153,9 @@ class Fold:
         self.records = []
         self.trials = []
         self.heads = [tuple(h) for h in config['heads']]
+        self.ricci_storage = config.get('ricci_storage', 'active-v2')
+        if self.ricci_storage not in ('active-v2', 'dense'):
+            raise ValueError('Unknown Ricci storage format')
 
         self.units = None if release_id is None else unitcache.Units(store, [
             release_id, factory.arm, factory.version, config, unitcache.environment()])
@@ -197,6 +201,10 @@ class Fold:
                     raise ValueError('Wrong unit vector layout')
             if name != 'Ricci':
                 return None
+            if self.ricci_storage == 'active-v2':
+                if 'contract' not in block:
+                    raise ValueError('Unbound Ricci producer evidence')
+                vector_storage.verify_evidence(self.store, block, train, valid, self.factory.arm, factory=self.factory)
             refhash = 'identity' if ref is None else array_id(self.store.load_array(
                 json.loads(self.store.read(ref))['log_reference']))
             rows = unitcache.geometry_proof(self.factory, partition, setting, refhash, [*train.index, *valid.index])
@@ -275,6 +283,12 @@ class Fold:
                               reference=reference, catalogue=graph.catalogue_digest,
                               mapping=graph.mapping_digest, features=s.record(list(names)), axis=self.axis,
                               training_people_sha256=sha(canonical_json(sorted(set(train.person))))))
+        if name == 'Ricci' and self.ricci_storage == 'active-v2':
+            frames = dict(train=train, validate=valid)
+            vectors = {side: FrozenVectors(values, tuple(frames[side].index), tuple(names),
+                                           f.arm, partition, model, name)
+                       for side, values in [('train', tr), ('validate', va)]}
+            return vector_storage.capture_block(s, model, vectors, frames, f)
         def freeze(values, frame):
             vec = FrozenVectors(values, tuple(frame.index), tuple(names), f.arm, partition, model, name)
             return s.vector(vec)
@@ -393,6 +407,8 @@ class Fold:
         s = self.store
         n = len(self.factory.graphs.axis)
         model = s.record(dict(name='K0', source=ricci['model'], columns=[0, n]))
+        if 'contract' in ricci:
+            return vector_storage.projected_block(s, ricci, model, n)
         result = dict(model=model)
         for split in ('train', 'validate'):
             v = s.load_vector(ricci[split])
@@ -452,11 +468,11 @@ def geometry_files(destination, expected):
             raise ValueError('Invalid geometry receipt')
         if record['key']['arm'] == 'RAW':
             primitives.add(record['raw_calculation'])
-        arr = path.with_name(record['sha256'] + '.npy')
-        if bundle.sha(arr) != record['sha256']:
+        arr = path.with_name(payload_name(record))
+        if bundle.sha(arr) != record.get('zlib_sha256', record['sha256']):
             raise ValueError('Changed curvature array')
         files[str(path.relative_to(destination))] = sha(data)
-        files[str(arr.relative_to(destination))] = record['sha256']
+        files[str(arr.relative_to(destination))] = record.get('zlib_sha256', record['sha256'])
     if shards:
         raise ValueError('Missing geometry receipts')
     actual = {p.parent.name for p in (geometry / '.raw-numerics').glob('*/receipt.json')}
@@ -466,11 +482,11 @@ def geometry_files(destination, expected):
         path = geometry / '.raw-numerics' / primitive / 'receipt.json'
         data = path.read_bytes()
         record = json.loads(data)['record']
-        array = path.with_name(record['sha256'] + '.npy')
-        if bundle.sha(array) != record['sha256']:
+        array = path.with_name(payload_name(record))
+        if bundle.sha(array) != record.get('zlib_sha256', record['sha256']):
             raise ValueError('Changed RAW numerical array')
         files[str(path.relative_to(destination))] = sha(data)
-        files[str(array.relative_to(destination))] = record['sha256']
+        files[str(array.relative_to(destination))] = record.get('zlib_sha256', record['sha256'])
     return files
 
 
