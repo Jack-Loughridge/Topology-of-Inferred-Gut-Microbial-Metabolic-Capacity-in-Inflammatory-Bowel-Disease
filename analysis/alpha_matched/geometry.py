@@ -254,13 +254,18 @@ class RationalRepair:
                for i,row in enumerate(self.rows) if i!=t),default=F(0))
         err=r/(1-self.rho)
         self.max_hit=max(self.max_hit,ref.upper_float(err))
-        col=[(ref.Band(F(0),F(0)) if i==t else
-              ref.Band(ref.distance(min(self.rho,h[i]+err),self.eps).lo,
-                       ref.distance(max(F(0),h[i]-err),self.eps).hi)) for i in range(n)]
-        self.columns[cache_key]=col
+        self.columns[cache_key]=(h,err)
         if len(self.columns)>self.limit:
             self.columns.popitem(last=False)
-        return col
+        return h,err
+
+    def distances(self,t,exact,indices):
+        # The residual above certifies all vertices. Evaluate its logarithmic
+        # bounds only where this edge's full transport matrix needs a cost.
+        hits,err=self.column(t,exact)
+        return [(ref.Band(F(0),F(0)) if i==t else
+                 ref.Band(ref.distance(min(self.rho,hits[i]+err),self.eps).lo,
+                          ref.distance(max(F(0),hits[i]-err),self.eps).hi)) for i in indices]
 
     def iterate(self,t):
         # Round iterates to a positive 144-bit grid. Compute exact residual afterwards.
@@ -278,8 +283,8 @@ class RationalRepair:
 
     def edge(self,u,v,x,y,tol):
         for exact in (False,True):
-            columns=[self.column(int(t),exact) for t in y]
-            c=[[col[i] for col in columns] for i in x]
+            columns=[self.distances(int(t),exact,x) for t in y]
+            c=[list(row) for row in zip(*columns)]
             ma=[self.mus[u][int(i)] for i in x]
             mb=[self.mus[v][int(j)] for j in y]
             if exact:
