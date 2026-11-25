@@ -304,7 +304,10 @@ class TestFold(unittest.TestCase):
                 for store, receipt in fits:
                     fit = json.loads(store.read(receipt['arms']['RAW']['outputs']['species']))
                     endpoint = fit['endpoint']
-                    results = runner.apply_final(dev, submission, panel, 'invented-new', endpoint, out)
+                    with patch.object(Store, 'probabilities', autospec=True, side_effect=Store.probabilities) as calls:
+                        results = runner.apply_final(dev, submission, panel, 'invented-new', endpoint, out)
+                    species_calls = [c for c in calls.call_args_list if c.args[1] == 'species']
+                    self.assertEqual(len(species_calls), len(graph.sample_ids))
                     self.assertEqual(len(results), 20)
                     rows = [json.loads(line) for line in (out / results[endpoint + '-RAW-species']).read_text().splitlines()]
                     state = json.loads(store.read(fit['blocks'][0]['model']))['state']

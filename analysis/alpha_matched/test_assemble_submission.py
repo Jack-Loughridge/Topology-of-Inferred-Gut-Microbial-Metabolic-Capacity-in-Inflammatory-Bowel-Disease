@@ -94,7 +94,10 @@ class AssemblyTest(unittest.TestCase):
             work=manifest.parent.parent
             prediction_dir=work/'predictions';prediction_dir.mkdir()
             (prediction_dir/'graph_roster.json').write_bytes(driver.canonical_json(fixture_roster))
-            outputs=driver.apply_final(root,manifest.parent,panel,'invented-new','binary',prediction_dir)
+            with patch.object(driver.Store, 'probabilities', autospec=True, side_effect=driver.Store.probabilities) as calls:
+                outputs=driver.apply_final(root,manifest.parent,panel,'invented-new','binary',prediction_dir)
+            species_calls = [call for call in calls.call_args_list if call.args[1] == 'species']
+            self.assertEqual(len(species_calls), len(fixture_roster['cohorts']['invented-new']))
             self.assertEqual(len(outputs),42)
             seal=driver.core.clinical.verify_and_seal(manifest.parent,review_file,'test-reviewer','test-evaluator',prediction_dir)
             self.assertEqual(len(json.loads(seal.read_bytes())['predictions']),42)

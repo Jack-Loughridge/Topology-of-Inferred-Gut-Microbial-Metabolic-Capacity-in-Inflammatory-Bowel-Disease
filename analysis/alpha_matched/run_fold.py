@@ -144,12 +144,25 @@ def validate_probabilities(p, nrows, classes):
         raise ValueError('Invalid class probabilities')
 
 
+def species_model_key(store, model, arm):
+    descriptor = json.loads(store.read(model))
+    if descriptor['name'] != 'species' or descriptor.pop('arm') != arm or descriptor['reference'] is not None:
+        raise ValueError('Invalid arm-independent species generator')
+    return sha(canonical_json(descriptor))
+
+
+def species_prediction_key(store, arm, spec, gen, x):
+    model = species_model_key(store, gen['blocks'][0], arm)
+    return (model, spec['head'], spec['endpoint'], tuple(spec['classes']), gen['implementation'], array_id(x))
+
+
 class Fold:
-    def __init__(self, proc, factory, store, config, species, check, release_id=None):
+    def __init__(self, proc, factory, store, config, species, check, release_id=None, species_fits=None):
         self.proc, self.factory, self.store = proc, factory, store
         self.config, self.species, self.check = config, species, check
         self.references = {}
         self.axis = digest(canonical_json(factory.graphs.axis))
+        self.species_fits = species_fits
         self.records = []
         self.trials = []
         self.heads = [tuple(h) for h in config['heads']]
@@ -294,10 +307,43 @@ class Fold:
             return s.vector(vec)
         return dict(model=model, train=freeze(tr, train), validate=freeze(va, valid))
 
+    def species_fit_key(self, key, block, head):
+        # This map lives inside one execute() call on immutable released metadata.
+        # Bind all fitting inputs and the application roster, including participant weights.
+        model = species_model_key(self.store, block['model'], self.factory.arm)
+        axes = []
+        for side in ('train', 'validate'):
+            v = json.loads(self.store.read(block[side]))
+            if (v['generator'], v['arm'], v['block']) != (block['model'], self.factory.arm, 'species'):
+                raise ValueError('Invalid species vector provenance')
+            axes.append([v[field] for field in ('partition', 'ids', 'features', 'values')])
+        train, valid = self.proc.frames(key)
+        training = list(zip(train.index, train.person, train.group, train.y.map(int)))
+        application = list(zip(valid.index, valid.person, valid.group))
+        return sha(canonical_json([self.config['endpoint'], self.config['classes'], self.factory.version,
+                                   key, head, model, axes, training, application]))
+
+    def reuse_species_fit(self, source, blocks):
+        info = json.loads(self.store.read(source))
+        info.update(arm=self.factory.arm, blocks=blocks)
+        if info['split'] == FINAL:
+            generators = json.loads(self.store.read(info['generators']))
+            generators['blocks'] = [b['model'] for b in blocks]
+            info['generators'] = self.store.record(generators)
+            deployment = json.loads(self.store.read(info['deployment']))
+            deployment.update(arm=self.factory.arm, generators=info['generators'])
+            info['deployment'] = self.store.record(deployment)
+        return self.store.record(info)
+
     def fit(self, name, key, blocks, head):
         self.check()
         s = self.store
-        record = self.unit('fit', name, key, [blocks, head], lambda: self._fit(name, key, blocks, head))
+        share = self.species_fit_key(key, blocks[0], head) if name == 'species' and self.species_fits is not None else None
+        def compute():
+            if share is not None and share in self.species_fits:
+                return self.reuse_species_fit(self.species_fits[share], blocks)
+            return self._fit(name, key, blocks, head)
+        record = self.unit('fit', name, key, [blocks, head], compute)
         info = json.loads(s.read(record))
         train, valid = self.proc.frames(key)
         expected = dict(name=name, arm=self.factory.arm, split=key, blocks=blocks, head=head,
@@ -328,6 +374,8 @@ class Fold:
             if list(valid.index) != info['samples'] or list(means.index) != info['participants']:
                 raise ValueError('Wrong fitted prediction roster')
             np.testing.assert_array_equal(means.to_numpy(), s.load_array(info['participant_means']))
+        if share is not None:
+            self.species_fits.setdefault(share, record)
         self.records.append(record)
         return p, record
 
@@ -519,6 +567,7 @@ def execute(root, fold):
         try:
             arms = {}
             certificates = set()
+            species_fits = {}
             for arm in ('RAW', 'RELATIVE'):
                 factory = Factory(graph, arm, destination / 'geometry', config['tolerances'])
                 factory.version = sha(canonical_json(rec['source_sha256']))
@@ -527,7 +576,7 @@ def execute(root, fold):
                 if (set(train.person) | set(valid.person) != set(meta.person)
                         or set(train.family) & set(valid.family) or train.empty or valid.empty != (fold == FINAL)):
                     raise ValueError('Invalid outer cohort partition')
-                worker = Fold(proc, factory, store, config, species, check, release_id)
+                worker = Fold(proc, factory, store, config, species, check, release_id, species_fits)
                 arms[arm] = worker.run(fold)
                 if config.get('fit_thresholds', False):
                     arms[arm]['decision_rules'] = select_thresholds(worker, fold)
@@ -664,6 +713,7 @@ def apply_final(root, submission, panel, cohort, endpoint, prediction_root):
         active(root)
         evidence = {}
         vectors = {}
+        species_predictions = {}
         for item in items:
             arm, method = item['arm'], item['method']
             store, spec, gen = methods[arm, method]
@@ -695,7 +745,13 @@ def apply_final(root, submission, panel, cohort, endpoint, prediction_root):
                 return vectors[key]
             blocks = [vector(key) for key in gen['blocks']]
             x = fusion_input(*blocks) if method == 'joint' else blocks[0].values
-            p = store.probabilities(method, spec['head'], x)
+            if method == 'species':
+                fit = species_prediction_key(store, arm, spec, gen, x)
+                if fit not in species_predictions:
+                    species_predictions[fit] = store.probabilities(method, spec['head'], x)
+                p = species_predictions[fit]
+            else:
+                p = store.probabilities(method, spec['head'], x)
             validate_probabilities(p, 1, spec['classes'])
             row = dict(sample=sample, probabilities=p[0].tolist(), submission_sha256=sid,
                        prediction_id=item['id'], class_order=spec['classes'],

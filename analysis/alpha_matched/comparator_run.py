@@ -482,12 +482,14 @@ def apply_final(root, submission, panel, cohort, endpoint, prediction_root):
                     vectors[key] = s.transform(key, factory, (sample,), graph.species_ids, curvature=proof)
                 blocks.append(vectors[key])
             identity = item['model_sha256']
-            if identity not in probabilities:
+            prediction_key = (core.species_prediction_key(s, arm, spec, gen, blocks[0].values)
+                              if method == 'species' else identity)
+            if prediction_key not in probabilities:
                 x = blocks[0].values if len(blocks) == 1 else fusion_input(*blocks)
                 p = heads.predict(s, spec['head'], x) if comparator else s.probabilities(method, spec['head'], x)
                 core.validate_probabilities(p, 1, item['class_order'])
-                probabilities[identity] = p[0].tolist()
-            row = dict(sample=sample, probabilities=probabilities[identity], submission_sha256=sid,
+                probabilities[prediction_key] = p[0].tolist()
+            row = dict(sample=sample, probabilities=probabilities[prediction_key], submission_sha256=sid,
                        prediction_id=item['id'], class_order=item['class_order'], model_sha256=identity,
                        generator_sha256=item['generator_sha256'])
             if item['requires_curvature']:
