@@ -23,6 +23,29 @@ def array_id(arr):
     return digest(canonical_json(arr.shape), arr.dtype.str.encode(), arr.tobytes(order='C'))
 
 
+def fitted_location_scale(values, weights):
+    """Keep exactly constant training coordinates at their native value and unit scale."""
+    values = np.asarray(values, dtype=np.float64)
+    # Use wider arithmetic for differences of finite doubles and variance at either
+    # end of their exponent range. Center relative to a training observation so
+    # the rounding of the serialized mean cannot inflate near-constant variance.
+    mean = np.empty(values.shape[1])
+    scale = np.empty_like(mean)
+    for begin in range(0, len(mean), 128):
+        columns = slice(begin, begin + 128)
+        block = values[:, columns].astype(np.longdouble)
+        origin = block[0]
+        offsets = block - origin
+        center = np.average(offsets, axis=0, weights=weights)
+        mean[columns] = origin + center
+        variance = np.average((offsets - center) ** 2, axis=0, weights=weights)
+        constant = (block.min(axis=0) == block.max(axis=0))
+        scale[columns] = np.where(constant, 1, np.sqrt(variance))
+    if not np.all(np.isfinite(mean) & np.isfinite(scale) & (scale > 0)):
+        raise FloatingPointError("Training location or scale outside representable range")
+    return mean, scale
+
+
 def immutable_array(values):
     arr = np.asarray(values)
     return np.frombuffer(arr.tobytes(order='C'), dtype=arr.dtype).reshape(arr.shape)

@@ -2,7 +2,7 @@
 import numpy as np
 from .h0 import merge_deaths
 from .nesting import fit_head, score, weights
-from .partitions import digest,canonical_json,RelativeReference
+from .partitions import digest,canonical_json,RelativeReference,fitted_location_scale
 
 
 class Baseline:
@@ -24,15 +24,18 @@ class Baseline:
                 den=w@native
                 if np.any(den<=0):
                     raise ValueError('Unobserved fitted species coordinate')
-                self.species_impute=(w@observed[:,self.species_axis].toarray())/den
+                values=observed[:,self.species_axis].toarray().astype(np.float64,copy=False)
+                self.species_impute=(w@values)/den
+                low=values.min(axis=0,where=native,initial=np.inf)
+                high=values.max(axis=0,where=native,initial=-np.inf)
+                constant=low==high
+                self.species_impute[constant]=low[constant]
         if name=='direct-relative':
             idx=[graphs.lookup[x] for x in train.index]
             self.reference=RelativeReference.fit(graphs.raw[idx],list(train.person),list(train.index),graphs.axis)
         t=self.values(train.index)
         w=weights(train.person)
-        self.mean=np.average(t,axis=0,weights=w)
-        self.scale=np.sqrt(np.average((t-self.mean)**2,axis=0,weights=w))
-        self.scale[self.scale==0]=1.
+        self.mean,self.scale=fitted_location_scale(t,w)
         self.partition=digest(canonical_json(sorted(zip(train.index,train.person))))
 
     def values(self,ids):

@@ -7,7 +7,7 @@ import numpy as np
 from .cache import CurvatureCache,record_sample
 from .geometry import compute
 from .h0 import Image,learn_image,merge_deaths
-from .partitions import FrozenVectors,RelativeReference,array_id,canonical_json,digest,immutable_array
+from .partitions import FrozenVectors,RelativeReference,array_id,canonical_json,digest,immutable_array,fitted_location_scale
 
 
 @dataclass
@@ -105,10 +105,9 @@ class Generator:
         raw=self.unscaled(tuple(train.index))
         _,p,count=np.unique(train.person,return_inverse=True,return_counts=True)
         w=1/count[p]
-        mean=np.average(raw,axis=0,weights=w)
-        sd=np.sqrt(np.average((raw-mean)**2,axis=0,weights=w))
+        mean,sd=fitted_location_scale(raw,w)
         self.mean=immutable_array(mean)
-        self.scale=immutable_array(np.where(sd==0,1,sd))
+        self.scale=immutable_array(sd)
         self.names=self.feature_names()
         refhash=array_id(reference.log_reference) if reference is not None else 'identity'
         extra=[] if self.image is None else [array_id(self.image.alpha),array_id(self.image.bounds),self.image.bandwidth,self.image.source_cuts]
